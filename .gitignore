@@ -16,8 +16,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# lock files (only keep pnpm-lock.yaml)
+package-lock.json
+yarn.lock
+
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel

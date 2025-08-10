@@ -1,9 +1,11 @@
-'use client';
+"use client"
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { analyticsAPI } from "@/lib/api"
 import { Progress } from '@/components/ui/progress';
 import { 
   Activity, 
@@ -53,35 +55,9 @@ export default function RealtimeAnalytics() {
   useEffect(() => {
     const fetchRealtimeStats = async () => {
       try {
-        // Mock data - replace with actual API call
-        const mockStats: RealtimeStats = {
-          currentUsers: 1247,
-          activeParties: 43,
-          watchingNow: 892,
-          messagesPerMinute: 156,
-          serverLoad: 34,
-          bandwidth: 2.4,
-          uptime: '15d 8h 23m',
-          regions: [
-            { name: 'US West', users: 456, latency: 23 },
-            { name: 'US East', users: 398, latency: 18 },
-            { name: 'Europe', users: 267, latency: 45 },
-            { name: 'Asia', users: 126, latency: 67 }
-          ],
-          devices: {
-            desktop: 678,
-            mobile: 423,
-            tablet: 146
-          },
-          activityData: Array.from({ length: 24 }, (_, i) => ({
-            time: `${String(i).padStart(2, '0')}:00`,
-            users: Math.floor(Math.random() * 500) + 800,
-            parties: Math.floor(Math.random() * 30) + 20,
-            messages: Math.floor(Math.random() * 100) + 50
-          }))
-        };
-        
-        setStats(mockStats);
+        // Real API call for realtime analytics
+        const realtimeData = await analyticsAPI.getRealtimeAnalytics();
+        setStats(realtimeData);
         setLoading(false);
       } catch (error) {
         console.error('Failed to fetch realtime stats:', error);
