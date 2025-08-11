@@ -45,7 +45,8 @@ jobs:
           next.config.mjs \
           ecosystem.config.js \
           deploy.sh \
-          generate-nginx-config.sh
+          generate-nginx-config.sh \
+          generate-nginx-config-http.sh
 
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.3
@@ -81,4 +82,5 @@ jobs:
           tar -xzf deployment.tar.gz
           chmod +x deploy.sh
           chmod +x generate-nginx-config.sh
+          chmod +x generate-nginx-config-http.sh
           sudo ./deploy.sh watch-party.brahim-elhouss.me
