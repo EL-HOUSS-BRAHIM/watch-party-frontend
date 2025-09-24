@@ -18,8 +18,6 @@ import {
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Progress } from "@/components/ui/progress"
-import { toast } from "@/hooks/use-toast"
-import { api } from "@/lib/api/client"
 import {
   Users,
   UserPlus,
@@ -41,7 +39,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { socialAPI, usersAPI } from "@/lib/api"
+import { usersAPI } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
 interface User {
@@ -257,7 +255,7 @@ export function EnhancedSocialFeatures() {
     try {
       // Fetch social data from API
       const [friendsData, communitiesData, activityData, achievementsData] = await Promise.all([
-        api.users.getFriends(),
+        usersAPI.getFriends(),
         // Mock API calls for now - these would be actual API endpoints
         Promise.resolve({ results: [] }),
         Promise.resolve({ results: [] }),

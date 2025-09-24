@@ -60,16 +60,11 @@ export class MessagingAPI {
   }
 
   /**
-   * Mark conversation as read
-   */
-  async markConversationAsRead(conversationId: number | string): Promise<APIResponse> {
-    return apiClient.post<APIResponse>(`${API_ENDPOINTS.messaging.conversations}/${conversationId}/read/`)
-  }
-
-  /**
    * Get online friends for quick messaging
    */
   async getOnlineFriends(): Promise<any[]> {
-    return apiClient.get<any[]>("/api/users/friends/?online_only=true")
+    return apiClient.get<any[]>(API_ENDPOINTS.users.friends, {
+      params: { online_only: true },
+    })
   }
 }

@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useRouter } from "next/navigation"
 import { AuthAPI } from "@/lib/api/auth"
 import { UsersAPI } from "@/lib/api/users"
-import type { User as APIUser, AuthResponse, RegisterData as APIRegisterData } from "@/lib/api/types"
+import type { User as APIUser, RegisterData as APIRegisterData } from "@/lib/api/types"
 
 // Initialize API instances directly
 const authAPI = new AuthAPI()
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const token = localStorage.getItem("access_token")
+      const token = localStorage.getItem("access_token") ?? localStorage.getItem("accessToken")
       if (!token) {
         setIsLoading(false)
         return
@@ -91,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem("access_token")
         localStorage.removeItem("refresh_token")
+        localStorage.removeItem("accessToken")
+        localStorage.removeItem("refreshToken")
       }
     } finally {
       setIsLoading(false)
@@ -104,6 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (typeof window !== 'undefined') {
         localStorage.setItem("access_token", response.access_token)
         localStorage.setItem("refresh_token", response.refresh_token)
+        localStorage.setItem("accessToken", response.access_token)
+        localStorage.setItem("refreshToken", response.refresh_token)
       }
       
       const user = { 
@@ -134,6 +138,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (typeof window !== 'undefined') {
           localStorage.setItem("access_token", response.access_token)
           localStorage.setItem("refresh_token", response.refresh_token)
+          localStorage.setItem("accessToken", response.access_token)
+          localStorage.setItem("refreshToken", response.refresh_token)
         }
         setUser({ 
           ...response.user, 
@@ -160,6 +166,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem("access_token")
         localStorage.removeItem("refresh_token")
+        localStorage.removeItem("accessToken")
+        localStorage.removeItem("refreshToken")
       }
       setUser(null)
       router.push("/login")
@@ -201,8 +209,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resendVerification = async () => {
     try {
-      // Note: This endpoint may need to be added to the backend
-      await authAPI.verifyEmail("") // Placeholder - needs backend implementation
+      if (!user?.email) {
+        throw new Error("No user email available for verification resend")
+      }
+
+      await authAPI.resendVerification(user.email)
     } catch (error) {
       throw error
     }
@@ -210,27 +221,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const socialLogin = async (provider: "google" | "github") => {
     try {
-      // Get OAuth redirect URL from backend
-      const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       const redirectUri = `${window.location.origin}/callback?provider=${provider}`
-      
-      const response = await fetch(`${baseURL}/api/auth/social/${provider}/redirect/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          redirect_uri: redirectUri,
-        }),
-      })
 
-      if (!response.ok) {
-        throw new Error("Failed to get OAuth URL")
-      }
+      const data = await authAPI.getSocialAuthUrl(provider, redirectUri)
 
-      const data = await response.json()
-      
-      if (data.redirect_url) {
+      if (data?.redirect_url) {
         window.location.href = data.redirect_url
       } else {
         throw new Error("No redirect URL received")
@@ -247,13 +242,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Cannot refresh token on server side")
       }
 
-      const refreshToken = localStorage.getItem("refresh_token")
+      const refreshToken =
+        localStorage.getItem("refresh_token") ?? localStorage.getItem("refreshToken")
       if (!refreshToken) {
         throw new Error("No refresh token available")
       }
 
       const response = await authAPI.refreshToken()
       localStorage.setItem("access_token", response.access)
+      localStorage.setItem("accessToken", response.access)
 
       // Get updated user data
       const userData = await authAPI.getProfile()
@@ -261,7 +258,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem("access_token")
+        localStorage.removeItem("accessToken")
         localStorage.removeItem("refresh_token")
+        localStorage.removeItem("refreshToken")
       }
       setUser(null)
       throw error
@@ -296,7 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = async () => {
     try {
       setIsLoading(true)
-      const token = localStorage.getItem("access_token")
+      const token = localStorage.getItem("access_token") ?? localStorage.getItem("accessToken")
       if (token) {
         const userData = await authAPI.getProfile()
         setUser(userData)

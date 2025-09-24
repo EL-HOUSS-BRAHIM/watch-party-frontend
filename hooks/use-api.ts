@@ -297,10 +297,30 @@ export function useApi() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
+  const normalizeEndpoint = useCallback((endpoint: string) => {
+    if (!endpoint || typeof endpoint !== "string") {
+      return endpoint
+    }
+
+    if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
+      return endpoint
+    }
+
+    if (!endpoint.startsWith("/")) {
+      return endpoint
+    }
+
+    if (endpoint === "/api" || endpoint.startsWith("/api/")) {
+      return endpoint
+    }
+
+    return `/api${endpoint}`
+  }, [])
+
   const execute = useCallback(async (apiCall: () => Promise<unknown>) => {
     setLoading(true)
     setError(null)
-    
+
     try {
       const result = await apiCall()
       setData(result)
@@ -315,28 +335,33 @@ export function useApi() {
   }, [])
 
   const get = useCallback(async (endpoint: string, config?: any) => {
-    return execute(() => apiClient.get(endpoint, config))
-  }, [execute])
+    const result = await execute(() => apiClient.get(normalizeEndpoint(endpoint), config))
+    return { data: result }
+  }, [execute, normalizeEndpoint])
 
   const post = useCallback(async (endpoint: string, data?: any, config?: any) => {
-    return execute(() => apiClient.post(endpoint, data, config))
-  }, [execute])
+    const result = await execute(() => apiClient.post(normalizeEndpoint(endpoint), data, config))
+    return { data: result }
+  }, [execute, normalizeEndpoint])
 
   const put = useCallback(async (endpoint: string, data?: any, config?: any) => {
-    return execute(() => apiClient.put(endpoint, data, config))
-  }, [execute])
+    const result = await execute(() => apiClient.put(normalizeEndpoint(endpoint), data, config))
+    return { data: result }
+  }, [execute, normalizeEndpoint])
 
   const patch = useCallback(async (endpoint: string, data?: any, config?: any) => {
-    return execute(() => apiClient.patch(endpoint, data, config))
-  }, [execute])
+    const result = await execute(() => apiClient.patch(normalizeEndpoint(endpoint), data, config))
+    return { data: result }
+  }, [execute, normalizeEndpoint])
 
   const deleteMethod = useCallback(async (endpoint: string, config?: any) => {
-    return execute(() => apiClient.delete(endpoint, config))
-  }, [execute])
+    const result = await execute(() => apiClient.delete(normalizeEndpoint(endpoint), config))
+    return { data: result }
+  }, [execute, normalizeEndpoint])
 
-  return { 
-    data, 
-    loading, 
+  return {
+    data,
+    loading,
     error, 
     execute,
     get,

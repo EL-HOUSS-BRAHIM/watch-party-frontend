@@ -48,6 +48,26 @@ export interface AuthResponse {
   refresh_token: string
   user: User
   verification_sent?: boolean
+  requires_2fa?: boolean
+  temp_token?: string
+  email?: string
+  message?: string
+}
+
+export interface TwoFactorSetupResponse {
+  success?: boolean
+  qr_code?: string
+  secret: string
+  backup_codes?: string[]
+}
+
+export interface TwoFactorVerifyResponse {
+  success: boolean
+  backup_codes?: string[]
+  access_token?: string
+  refresh_token?: string
+  user?: User
+  message?: string
 }
 
 // Additional User Types

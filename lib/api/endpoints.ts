@@ -274,6 +274,7 @@ export const API_ENDPOINTS = {
   notifications: {
     list: '/api/notifications/',
     markRead: (id: string) => `/api/notifications/${id}/mark-read/`,
+    markAllRead: '/api/notifications/mark-all-read/',
     preferences: '/api/notifications/preferences/',
     pushTokenUpdate: '/api/notifications/push/token/update/',
     

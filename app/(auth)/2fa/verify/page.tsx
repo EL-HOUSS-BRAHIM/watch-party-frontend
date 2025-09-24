@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
+import { useMemo } from "react"
 import {
   Shield,
   Smartphone,
@@ -22,11 +23,13 @@ import {
   Clock,
 } from "lucide-react"
 import Link from "next/link"
+import { AuthAPI } from "@/lib/api/auth"
 
 function TwoFactorVerifyForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const authService = useMemo(() => new AuthAPI(), [])
 
   const [verificationCode, setVerificationCode] = useState("")
   const [backupCode, setBackupCode] = useState("")
@@ -125,56 +128,64 @@ function TwoFactorVerifyForm() {
     setErrors({})
 
     try {
-      const response = await fetch("/api/auth/2fa/verify/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          temp_token: tempToken,
-          code: useBackupCode ? backupCodeToVerify : codeToVerify,
-          is_backup_code: useBackupCode,
-        }),
+      const payloadCode = useBackupCode ? backupCodeToVerify : codeToVerify
+      const response = await authService.verify2FA(payloadCode, {
+        is_backup_code: useBackupCode || undefined,
+        context: searchParams.get("context") || undefined,
+        temp_token: tempToken || undefined,
+        email: email || undefined,
       })
 
-      const data = await response.json()
-
-      if (response.ok) {
-        // Store tokens
-        localStorage.setItem("accessToken", data.access_token)
-        localStorage.setItem("refreshToken", data.refresh_token)
-
-        toast({
-          title: "Login Successful",
-          description: "You have been successfully authenticated.",
-        })
-
-        // Redirect to intended destination or dashboard
-        const redirectTo = searchParams.get("redirect") || "/dashboard"
-        router.push(redirectTo)
-      } else {
-        if (data.attempts_remaining !== undefined) {
-          setAttemptsRemaining(data.attempts_remaining)
-        }
-
-        if (data.attempts_remaining === 0) {
-          toast({
-            title: "Account Locked",
-            description: "Too many failed attempts. Please try again later.",
-            variant: "destructive",
-          })
-          router.push("/login?error=account-locked")
-        } else {
-          setErrors({
-            [useBackupCode ? "backup" : "code"]: data.message || "Invalid code. Please try again.",
-          })
-        }
+      if (!response?.success) {
+        const message = response?.message || "Invalid code. Please try again."
+        setErrors({ [useBackupCode ? "backup" : "code"]: message })
+        return
       }
-    } catch (error) {
+
+      if (response.backup_codes?.length) {
+        toast({
+          title: "Backup codes", 
+          description: "New backup codes generated. Save them in a secure place.",
+        })
+      }
+
+      if (response.access_token) {
+        localStorage.setItem("access_token", response.access_token)
+        localStorage.setItem("accessToken", response.access_token)
+      }
+      if (response.refresh_token) {
+        localStorage.setItem("refresh_token", response.refresh_token)
+        localStorage.setItem("refreshToken", response.refresh_token)
+      }
+
+      toast({
+        title: "Login Successful",
+        description: "You have been successfully authenticated.",
+      })
+
+      const redirectTo = searchParams.get("redirect") || "/dashboard"
+      router.push(redirectTo)
+    } catch (error: any) {
       console.error("2FA verification error:", error)
+      const data = error?.response?.data
+
+      if (typeof data?.attempts_remaining === "number") {
+        setAttemptsRemaining(data.attempts_remaining)
+      }
+
+      if (data?.attempts_remaining === 0 || data?.account_locked) {
+        toast({
+          title: "Account Locked",
+          description: "Too many failed attempts. Please try again later.",
+          variant: "destructive",
+        })
+        router.push("/login?error=account-locked")
+        return
+      }
+
+      const message = data?.message || error?.message || "Verification failed. Please try again."
       setErrors({
-        [useBackupCode ? "backup" : "code"]: "Verification failed. Please try again.",
+        [useBackupCode ? "backup" : "code"]: message,
       })
     } finally {
       setIsLoading(false)
@@ -184,34 +195,12 @@ function TwoFactorVerifyForm() {
   const resendCode = async () => {
     setIsResendingCode(true)
     try {
-      const response = await fetch("/api/auth/2fa/resend/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          temp_token: tempToken,
-        }),
-      })
-
-      if (response.ok) {
-        toast({
-          title: "Code Sent",
-          description: "A new verification code has been sent to your authenticator app.",
-        })
-        setTimeRemaining(300) // Reset timer
-        setAttemptsRemaining(5) // Reset attempts
-      } else {
-        throw new Error("Failed to resend code")
-      }
-    } catch (error) {
-      console.error("Resend code error:", error)
       toast({
-        title: "Resend Failed",
-        description: "Failed to resend verification code. Please try again.",
-        variant: "destructive",
+        title: "Need a new code?",
+        description: "Open your authenticator app to retrieve the latest code.",
       })
+      setTimeRemaining(300)
+      setAttemptsRemaining(5)
     } finally {
       setIsResendingCode(false)
     }
