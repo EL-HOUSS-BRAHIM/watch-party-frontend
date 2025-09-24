@@ -86,9 +86,13 @@ export default function ChatStatsPage() {
     setLoading(true);
     try {
       // Fetch chat statistics from multiple API endpoints
+      const defaultRoomId = selectedChannel !== 'all' ? selectedChannel : 'global'
+
       const [messagesResponse, usersResponse, moderationResponse] = await Promise.allSettled([
         chatAPI.getPartyMessages({ timeframe, channel: selectedChannel !== 'all' ? selectedChannel : undefined }),
-        chatAPI.getActiveUsers({ timeframe }),
+        typeof chatAPI.getActiveUsers === 'function'
+          ? chatAPI.getActiveUsers(defaultRoomId)
+          : Promise.resolve({ active_users: [], total_active: 0 }),
         chatAPI.getModerationStats ? chatAPI.getModerationStats({ timeframe }) : Promise.resolve(null)
       ])
 
@@ -136,10 +140,16 @@ export default function ChatStatsPage() {
 
       // Process users data
       if (usersResponse.status === 'fulfilled' && usersResponse.value) {
-        const usersData = usersResponse.value
-        chatStats.totalUsers = Number(usersData.total_users ?? usersData.total ?? 0)
-        chatStats.activeUsers = Number(usersData.active_users ?? usersData.active ?? 0)
-        
+        const usersData = usersResponse.value as { active_users?: any[]; total_active?: number; total_users?: number; total?: number }
+        const activeList = Array.isArray(usersData.active_users)
+          ? usersData.active_users
+          : Array.isArray(usersResponse.value)
+            ? (usersResponse.value as any[])
+            : []
+
+        chatStats.totalUsers = Number(usersData.total_users ?? usersData.total ?? activeList.length ?? 0)
+        chatStats.activeUsers = Number(usersData.total_active ?? activeList.length ?? 0)
+
         if (chatStats.totalMessages > 0 && chatStats.totalUsers > 0) {
           chatStats.averageMessagesPerUser = Number((chatStats.totalMessages / chatStats.totalUsers).toFixed(1))
         }

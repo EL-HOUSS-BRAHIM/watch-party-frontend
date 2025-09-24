@@ -33,7 +33,7 @@ Based on the endpoint validation script results, the following areas still requi
 - `app/admin/chat/stats/page.tsx` - Mock chat totals and moderation activity
 - `components/admin/faq-management.tsx` - Local FAQ list and stats
 - `components/security/session-management.tsx` - Mock session lists and revoke flows
-- `components/groups/group-management-system.tsx` - Fake member lists and delays
+- **✅** `components/groups/group-management-system.tsx` - Live social groups, membership rosters, and join/leave actions now flow through the social API client.【F:components/groups/group-management-system.tsx†L214-L438】
 
 ## Phase 6 – Integrations & External Services (PENDING)
 - `components/integrations/google-drive-upload.tsx` - Simulated folder tree and uploads
@@ -67,7 +67,6 @@ Based on the endpoint validation script results, the following areas still requi
 | --- | --- | --- | --- |
 | `components/admin/faq-management.tsx` | FAQ list and stats are seeded locally on load.【F:components/admin/faq-management.tsx†L80-L154】 | `supportAPI.getFAQs`, `supportAPI.updateFAQ`, `supportAPI.voteFAQ`【F:backend-api.json†L4493-L4545】 | Hook CRUD, ordering, and voting to support FAQ endpoints.
 | `app/admin/chat/stats/page.tsx` | Chat totals, charts, and moderation activity are randomised datasets.【F:app/admin/chat/stats/page.tsx†L54-L92】 | `chatAPI.getPartyMessages`, `chatAPI.getActiveUsers`【F:backend-api.json†L2514-L2635】 | Fetch room analytics and moderation stats from chat endpoints.
-| `components/groups/group-management-system.tsx` | Group/member lists rely on mock payloads and fake delays.【F:components/groups/group-management-system.tsx†L95-L190】 | `socialAPI.getGroups`, `socialAPI.getGroup`, `socialAPI.joinGroup`【F:backend-api.json†L4745-L4799】 | Use social group endpoints for roster management and membership actions.
 | `components/security/advanced-security-system.tsx` | Threats, rules, audit logs, and compliance reports are hard-coded.【F:components/security/advanced-security-system.tsx†L86-L220】 | `adminAPI.getSystemHealth`, `adminAPI.getLogs`, `adminAPI.getComplianceReports`【F:backend-api.json†L5227-L5266】 | Bind security dashboards to admin telemetry and compliance feeds.
 | `components/security/session-management.tsx` | Session list and revoke flows operate on mock sessions only.【F:components/security/session-management.tsx†L64-L151】 | `usersAPI.getSessions`, `usersAPI.deleteSession`, `usersAPI.revokeAllSessions`【F:backend-api.json†L846-L1215】 | Replace fixtures with real session management and destructive actions.
 | `components/testing/testing-suite-dashboard.tsx` | Test suites and results are fabricated and timers simulate execution.【F:components/testing/testing-suite-dashboard.tsx†L102-L200】 | `analyticsAPI.getDashboard`, `analyticsAPI.postAdvancedQuery`【F:backend-api.json†L3200-L3284】 | Expose CI/test analytics via dashboard and advanced query endpoints.

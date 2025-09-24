@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +30,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { socialAPI } from "@/lib/api"
 import {
   Users,
   Plus,
@@ -45,23 +46,25 @@ import {
   Lock,
   Globe,
   Eye,
+  Loader2,
 } from "lucide-react"
 
 interface Group {
   id: string
+  backendId?: number
   name: string
   description: string
-  avatar: string
+  avatar?: string
   privacy: "public" | "private" | "invite-only"
   memberCount: number
-  maxMembers: number
+  maxMembers?: number
   category: string
   tags: string[]
-  createdAt: string
+  createdAt?: string
   owner: {
     id: string
     name: string
-    avatar: string
+    avatar?: string
   }
   isOwner: boolean
   isMember: boolean
@@ -73,13 +76,119 @@ interface GroupMember {
   user: {
     id: string
     name: string
-    avatar: string
-    email: string
+    avatar?: string
+    email?: string
   }
   role: "owner" | "admin" | "moderator" | "member"
-  joinedAt: string
-  lastActive: string
+  joinedAt?: string
+  lastActive?: string
   status: "active" | "inactive" | "banned"
+}
+
+const DEFAULT_CATEGORIES = ["Entertainment", "Education", "Sports", "Gaming", "Music", "Other"]
+
+const fallbackId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`
+
+const extractCollection = (value: any): any[] => {
+  if (!value) return []
+  if (Array.isArray(value)) return value
+  if (Array.isArray(value?.results)) return value.results
+  if (Array.isArray(value?.data)) return value.data
+  return []
+}
+
+const mapMemberStatus = (member: any): GroupMember["status"] => {
+  const rawStatus = member?.status ?? (member?.is_banned ? "banned" : member?.is_active === false ? "inactive" : undefined)
+
+  switch (rawStatus) {
+    case "inactive":
+      return "inactive"
+    case "banned":
+      return "banned"
+    default:
+      return "active"
+  }
+}
+
+const normalizeGroupMember = (member: any): GroupMember => {
+  const memberUser = member?.user ?? member
+  const firstName = memberUser?.first_name ?? memberUser?.firstName
+  const lastName = memberUser?.last_name ?? memberUser?.lastName
+  const composedName = [firstName, lastName].filter(Boolean).join(" ")
+  const name = memberUser?.name ?? memberUser?.full_name ?? memberUser?.username ?? composedName || "Member"
+
+  return {
+    id: String(member?.id ?? memberUser?.id ?? fallbackId("member")),
+    user: {
+      id: String(memberUser?.id ?? fallbackId("user")),
+      name,
+      avatar: memberUser?.avatar ?? memberUser?.image ?? undefined,
+      email: memberUser?.email ?? undefined,
+    },
+    role: (member?.role ?? member?.membership?.role ?? member?.group_role ?? "member") as GroupMember["role"],
+    joinedAt: member?.joined_at ?? member?.created_at ?? undefined,
+    lastActive: member?.last_active ?? member?.last_seen ?? member?.last_seen_at ?? undefined,
+    status: mapMemberStatus(member),
+  }
+}
+
+const derivePrivacy = (group: any): Group["privacy"] => {
+  if (group?.privacy === "invite-only" || group?.privacy === "private" || group?.privacy === "public") {
+    return group.privacy
+  }
+
+  if (group?.is_public === false) {
+    return group?.requires_invite ? "invite-only" : "private"
+  }
+
+  return "public"
+}
+
+const normalizeGroup = (group: any): Group => {
+  const backendId = typeof group?.id === "number" ? group.id : Number.parseInt(String(group?.id ?? ""), 10)
+  const owner = group?.owner ?? group?.created_by ?? {}
+  const firstName = owner?.first_name ?? owner?.firstName
+  const lastName = owner?.last_name ?? owner?.lastName
+  const ownerName = owner?.name ?? owner?.full_name ?? owner?.username ?? [firstName, lastName].filter(Boolean).join(" ") || "Group Owner"
+  const membership = group?.membership ?? {}
+  const tags = Array.isArray(group?.tags)
+    ? group.tags.map((tag: any) => String(tag))
+    : Array.isArray(group?.topics)
+    ? group.topics.map((topic: any) => String(topic))
+    : []
+  const memberCount =
+    group?.member_count ??
+    group?.members_count ??
+    (Array.isArray(group?.members) ? group.members.length : undefined) ??
+    0
+  const maxMembers = group?.max_members ?? group?.member_limit ?? group?.capacity
+
+  return {
+    id: backendId && Number.isFinite(backendId) ? String(backendId) : String(group?.slug ?? fallbackId("group")),
+    backendId: Number.isFinite(backendId) ? backendId : undefined,
+    name: group?.name ?? group?.title ?? "Untitled Group",
+    description: group?.description ?? group?.summary ?? "No description provided yet.",
+    avatar: group?.avatar ?? group?.image ?? group?.icon ?? undefined,
+    privacy: derivePrivacy(group),
+    memberCount,
+    maxMembers: typeof maxMembers === "number" && Number.isFinite(maxMembers) ? maxMembers : undefined,
+    category: group?.category ?? group?.topic ?? "General",
+    tags,
+    createdAt: group?.created_at ?? group?.createdAt ?? undefined,
+    owner: {
+      id: owner?.id ? String(owner.id) : fallbackId("user"),
+      name: ownerName,
+      avatar: owner?.avatar ?? owner?.image ?? undefined,
+    },
+    isOwner: Boolean(group?.is_owner ?? membership?.role === "owner"),
+    isMember: Boolean(group?.is_member ?? membership?.role),
+    role: membership?.role as Group["role"],
+  }
+}
+
+const parseGroupId = (groupId: string): number | null => {
+  const numeric = Number.parseInt(groupId, 10)
+  return Number.isNaN(numeric) ? null : numeric
 }
 
 export default function GroupManagementSystem() {
@@ -89,163 +198,203 @@ export default function GroupManagementSystem() {
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
-  const [isLoading, setIsLoading] = useState(false)
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false)
+  const [isFetchingGroups, setIsFetchingGroups] = useState(true)
+  const [isFetchingMembers, setIsFetchingMembers] = useState(false)
+  const [groupsError, setGroupsError] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
 
-  // Mock data
+  const loadGroups = useCallback(async () => {
+    if (typeof socialAPI.getGroups !== "function") {
+      setGroups([])
+      setGroupsError("Social API is not available in this environment.")
+      setIsFetchingGroups(false)
+      return
+    }
+
+    setIsFetchingGroups(true)
+    setGroupsError(null)
+
+    try {
+      const response = await socialAPI.getGroups({ page: 1 })
+      const results = extractCollection(response)
+      setGroups(results.map((group) => normalizeGroup(group)))
+    } catch (error) {
+      console.error("Failed to load groups", error)
+      setGroups([])
+      setGroupsError("Failed to load groups. Please try again.")
+      toast({
+        title: "Error",
+        description: "Unable to load groups from the server. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsFetchingGroups(false)
+    }
+  }, [toast])
+
   useEffect(() => {
-    const mockGroups: Group[] = [
-      {
-        id: "1",
-        name: "Movie Enthusiasts",
-        description: "A community for movie lovers to discuss and watch films together",
-        avatar: "/placeholder.svg?height=100&width=100&text=ME",
-        privacy: "public",
-        memberCount: 156,
-        maxMembers: 500,
-        category: "Entertainment",
-        tags: ["movies", "cinema", "reviews"],
-        createdAt: "2024-01-15",
-        owner: { id: "user1", name: "John Doe", avatar: "/placeholder.svg?height=40&width=40" },
-        isOwner: true,
-        isMember: true,
-        role: "owner",
-      },
-      {
-        id: "2",
-        name: "Anime Club",
-        description: "Watch and discuss anime series with fellow otakus",
-        avatar: "/placeholder.svg?height=100&width=100&text=AC",
-        privacy: "invite-only",
-        memberCount: 89,
-        maxMembers: 200,
-        category: "Entertainment",
-        tags: ["anime", "manga", "japanese"],
-        createdAt: "2024-02-01",
-        owner: { id: "user2", name: "Jane Smith", avatar: "/placeholder.svg?height=40&width=40" },
-        isOwner: false,
-        isMember: true,
-        role: "admin",
-      },
-      {
-        id: "3",
-        name: "Documentary Watchers",
-        description: "Educational documentaries and discussions",
-        avatar: "/placeholder.svg?height=100&width=100&text=DW",
-        privacy: "public",
-        memberCount: 234,
-        maxMembers: 1000,
-        category: "Education",
-        tags: ["documentaries", "education", "learning"],
-        createdAt: "2024-01-20",
-        owner: { id: "user3", name: "Mike Johnson", avatar: "/placeholder.svg?height=40&width=40" },
-        isOwner: false,
-        isMember: false,
-      },
-    ]
+    loadGroups()
+  }, [loadGroups])
 
-    const mockMembers: GroupMember[] = [
-      {
-        id: "1",
-        user: {
-          id: "user1",
-          name: "John Doe",
-          avatar: "/placeholder.svg?height=40&width=40",
-          email: "john@example.com",
-        },
-        role: "owner",
-        joinedAt: "2024-01-15",
-        lastActive: "2024-01-28",
-        status: "active",
-      },
-      {
-        id: "2",
-        user: {
-          id: "user2",
-          name: "Jane Smith",
-          avatar: "/placeholder.svg?height=40&width=40",
-          email: "jane@example.com",
-        },
-        role: "admin",
-        joinedAt: "2024-01-16",
-        lastActive: "2024-01-27",
-        status: "active",
-      },
-      {
-        id: "3",
-        user: {
-          id: "user3",
-          name: "Mike Johnson",
-          avatar: "/placeholder.svg?height=40&width=40",
-          email: "mike@example.com",
-        },
-        role: "moderator",
-        joinedAt: "2024-01-18",
-        lastActive: "2024-01-26",
-        status: "active",
-      },
-    ]
+  const categories = useMemo(() => {
+    const categorySet = new Set(DEFAULT_CATEGORIES)
+    groups.forEach((group) => {
+      if (group.category) {
+        categorySet.add(group.category)
+      }
+    })
+    return Array.from(categorySet)
+  }, [groups])
 
-    setGroups(mockGroups)
-    setGroupMembers(mockMembers)
+  const upsertGroup = useCallback((group: Group) => {
+    setGroups((prev) => {
+      const exists = prev.some((existing) => existing.id === group.id)
+      if (exists) {
+        return prev.map((existing) => (existing.id === group.id ? group : existing))
+      }
+      return [group, ...prev]
+    })
   }, [])
 
-  const handleCreateGroup = async (formData: FormData) => {
-    setIsLoading(true)
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      const newGroup: Group = {
-        id: Date.now().toString(),
-        name: formData.get("name") as string,
-        description: formData.get("description") as string,
-        avatar: "/placeholder.svg?height=100&width=100&text=" + (formData.get("name") as string).charAt(0),
-        privacy: formData.get("privacy") as "public" | "private" | "invite-only",
-        memberCount: 1,
-        maxMembers: Number.parseInt(formData.get("maxMembers") as string) || 100,
-        category: formData.get("category") as string,
-        tags: (formData.get("tags") as string).split(",").map((tag) => tag.trim()),
-        createdAt: new Date().toISOString().split("T")[0],
-        owner: { id: "current-user", name: "Current User", avatar: "/placeholder.svg?height=40&width=40" },
-        isOwner: true,
-        isMember: true,
-        role: "owner",
+  const refreshGroup = useCallback(
+    async (groupId: string, fallbackId?: number) => {
+      if (typeof socialAPI.getGroup !== "function") {
+        return null
       }
 
-      setGroups((prev) => [newGroup, ...prev])
+      const numericId =
+        parseGroupId(groupId) ?? (typeof fallbackId === "number" && Number.isFinite(fallbackId) ? fallbackId : null)
+      if (numericId === null) {
+        return null
+      }
+
+      try {
+        const detail = await socialAPI.getGroup(numericId)
+        const normalized = normalizeGroup(detail)
+        upsertGroup(normalized)
+        return { normalized, detail }
+      } catch (error) {
+        console.error(`Failed to refresh group ${groupId}`, error)
+        return null
+      }
+    },
+    [upsertGroup],
+  )
+
+  const handleCreateGroup = async (formData: FormData) => {
+    if (typeof socialAPI.createGroup !== "function") {
+      toast({
+        title: "Unavailable",
+        description: "Creating groups is not available in this environment.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const name = (formData.get("name") as string) ?? ""
+    const description = (formData.get("description") as string) ?? ""
+    const privacy = (formData.get("privacy") as Group["privacy"]) ?? "public"
+    const category = (formData.get("category") as string) ?? ""
+    const rawTags = (formData.get("tags") as string) ?? ""
+    const maxMembersRaw = formData.get("maxMembers")
+
+    const tags = rawTags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+    const maxMembersValue =
+      typeof maxMembersRaw === "string" && maxMembersRaw.length > 0
+        ? Number.parseInt(maxMembersRaw, 10)
+        : undefined
+
+    setIsCreatingGroup(true)
+    try {
+      const isPublic = privacy === "public"
+      const payload = {
+        name,
+        description,
+        is_public: isPublic,
+        category: category || undefined,
+        tags: tags.length ? tags : undefined,
+        max_members:
+          typeof maxMembersValue === "number" && !Number.isNaN(maxMembersValue) ? maxMembersValue : undefined,
+        requires_invite: privacy === "invite-only" ? true : undefined,
+        privacy: !isPublic ? privacy : undefined,
+      }
+
+      const created = await socialAPI.createGroup(payload)
+      let normalized = normalizeGroup(created)
+
+      if (tags.length && normalized.tags.length === 0) {
+        normalized = { ...normalized, tags }
+      }
+
+      if (
+        typeof maxMembersValue === "number" &&
+        !Number.isNaN(maxMembersValue) &&
+        typeof normalized.maxMembers !== "number"
+      ) {
+        normalized = { ...normalized, maxMembers: maxMembersValue }
+      }
+
+      if (!normalized.privacy && !isPublic) {
+        normalized = { ...normalized, privacy }
+      }
+
+      upsertGroup(normalized)
       setShowCreateDialog(false)
+
+      if (normalized.id) {
+        await refreshGroup(normalized.id, normalized.backendId)
+      }
 
       toast({
         title: "Group Created",
         description: "Your group has been created successfully!",
       })
     } catch (error) {
+      console.error("Failed to create group", error)
       toast({
         title: "Error",
         description: "Failed to create group. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setIsCreatingGroup(false)
     }
   }
 
-  const handleJoinGroup = async (groupId: string) => {
+  const handleJoinGroup = async (group: Group) => {
+    const numericId =
+      typeof group.backendId === "number" && Number.isFinite(group.backendId)
+        ? group.backendId
+        : parseGroupId(group.id)
+    if (numericId === null || typeof socialAPI.joinGroup !== "function") {
+      toast({
+        title: "Error",
+        description: "Joining this group is not available right now.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
-      setGroups((prev) =>
-        prev.map((group) =>
-          group.id === groupId
-            ? { ...group, isMember: true, memberCount: group.memberCount + 1, role: "member" }
-            : group,
-        ),
-      )
+      await socialAPI.joinGroup(numericId)
+      const result = await refreshGroup(group.id, group.backendId)
+
+      if (result && selectedGroup?.id === result.normalized.id) {
+        setSelectedGroup(result.normalized)
+        const members = extractCollection((result.detail as any)?.members).map((member) => normalizeGroupMember(member))
+        setGroupMembers(members)
+      }
 
       toast({
         title: "Joined Group",
         description: "You have successfully joined the group!",
       })
     } catch (error) {
+      console.error(`Failed to join group ${group.id}`, error)
       toast({
         title: "Error",
         description: "Failed to join group. Please try again.",
@@ -254,21 +403,36 @@ export default function GroupManagementSystem() {
     }
   }
 
-  const handleLeaveGroup = async (groupId: string) => {
+  const handleLeaveGroup = async (group: Group) => {
+    const numericId =
+      typeof group.backendId === "number" && Number.isFinite(group.backendId)
+        ? group.backendId
+        : parseGroupId(group.id)
+    if (numericId === null || typeof socialAPI.leaveGroup !== "function") {
+      toast({
+        title: "Error",
+        description: "Leaving this group is not available right now.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
-      setGroups((prev) =>
-        prev.map((group) =>
-          group.id === groupId
-            ? { ...group, isMember: false, memberCount: group.memberCount - 1, role: undefined }
-            : group,
-        ),
-      )
+      await socialAPI.leaveGroup(numericId)
+      const result = await refreshGroup(group.id, group.backendId)
+
+      if (result && selectedGroup?.id === result.normalized.id) {
+        setSelectedGroup(result.normalized)
+        const members = extractCollection((result.detail as any)?.members).map((member) => normalizeGroupMember(member))
+        setGroupMembers(members)
+      }
 
       toast({
         title: "Left Group",
         description: "You have left the group.",
       })
     } catch (error) {
+      console.error(`Failed to leave group ${group.id}`, error)
       toast({
         title: "Error",
         description: "Failed to leave group. Please try again.",
@@ -277,48 +441,60 @@ export default function GroupManagementSystem() {
     }
   }
 
-  const handleRoleChange = async (memberId: string, newRole: string) => {
-    try {
-      setGroupMembers((prev) =>
-        prev.map((member) =>
-          member.id === memberId ? { ...member, role: newRole as "owner" | "admin" | "moderator" | "member" } : member,
-        ),
-      )
+  // TODO: Add socialAPI member management once `/api/social/groups/<group_id>/members/<member_id>/` is exposed.
+  const handleRoleChange = async (_memberId: string, _newRole: string) => {
+    toast({
+      title: "Action unavailable",
+      description: "Updating member roles requires a backend endpoint (\"/api/social/groups/<group_id>/members/<member_id>/\").",
+    })
+  }
 
+  const handleRemoveMember = async (_memberId: string) => {
+    toast({
+      title: "Action unavailable",
+      description: "Removing members requires backend support for member management.",
+    })
+  }
+
+  const handleOpenGroup = async (group: Group) => {
+    setSelectedGroup(group)
+    setGroupMembers([])
+
+    if (typeof socialAPI.getGroup !== "function") {
       toast({
-        title: "Role Updated",
-        description: "Member role has been updated successfully.",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update member role.",
+        title: "Unavailable",
+        description: "Group details are not available in this environment.",
         variant: "destructive",
       })
+      return
+    }
+
+    setIsFetchingMembers(true)
+    try {
+      const result = await refreshGroup(group.id, group.backendId)
+      if (result) {
+        setSelectedGroup(result.normalized)
+        const members = extractCollection((result.detail as any)?.members).map((member) => normalizeGroupMember(member))
+        setGroupMembers(members)
+      }
+    } catch (error) {
+      console.error(`Failed to load group ${group.id}`, error)
+      toast({
+        title: "Error",
+        description: "Failed to load group details. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsFetchingMembers(false)
     }
   }
 
-  const handleRemoveMember = async (memberId: string) => {
-    try {
-      setGroupMembers((prev) => prev.filter((member) => member.id !== memberId))
-
-      toast({
-        title: "Member Removed",
-        description: "Member has been removed from the group.",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to remove member.",
-        variant: "destructive",
-      })
-    }
-  }
+  const normalizedQuery = searchQuery.trim().toLowerCase()
 
   const filteredGroups = groups.filter((group) => {
     const matchesSearch =
-      group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      group.description.toLowerCase().includes(searchQuery.toLowerCase())
+      group.name.toLowerCase().includes(normalizedQuery) ||
+      (group.description ?? "").toLowerCase().includes(normalizedQuery)
     const matchesCategory = categoryFilter === "all" || group.category === categoryFilter
     return matchesSearch && matchesCategory
   })
@@ -396,12 +572,11 @@ export default function GroupManagementSystem() {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Entertainment">Entertainment</SelectItem>
-                    <SelectItem value="Education">Education</SelectItem>
-                    <SelectItem value="Sports">Sports</SelectItem>
-                    <SelectItem value="Gaming">Gaming</SelectItem>
-                    <SelectItem value="Music">Music</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -434,8 +609,8 @@ export default function GroupManagementSystem() {
                 <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? "Creating..." : "Create Group"}
+                <Button type="submit" disabled={isCreatingGroup}>
+                  {isCreatingGroup ? "Creating..." : "Create Group"}
                 </Button>
               </div>
             </form>
@@ -463,24 +638,38 @@ export default function GroupManagementSystem() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="Entertainment">Entertainment</SelectItem>
-            <SelectItem value="Education">Education</SelectItem>
-            <SelectItem value="Sports">Sports</SelectItem>
-            <SelectItem value="Gaming">Gaming</SelectItem>
-            <SelectItem value="Music">Music</SelectItem>
-            <SelectItem value="Other">Other</SelectItem>
+            {categories.map((category) => (
+              <SelectItem key={category} value={category}>
+                {category}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
 
       {/* Groups Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredGroups.map((group) => (
-          <Card key={group.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12">
+      {groupsError && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {groupsError}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {isFetchingGroups ? (
+          <div className="col-span-full flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredGroups.length === 0 ? (
+          <div className="col-span-full rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+            No groups found. Try adjusting your filters or create a new group.
+          </div>
+        ) : (
+          filteredGroups.map((group) => (
+            <Card key={group.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
                     <AvatarImage src={group.avatar || "/placeholder.svg"} />
                     <AvatarFallback>{group.name.charAt(0)}</AvatarFallback>
                   </Avatar>
@@ -504,12 +693,17 @@ export default function GroupManagementSystem() {
             </CardHeader>
 
             <CardContent className="space-y-4">
-              <CardDescription className="line-clamp-2">{group.description}</CardDescription>
+              <CardDescription className="line-clamp-2">
+                {group.description || "No description provided."}
+              </CardDescription>
 
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
-                  {group.memberCount}/{group.maxMembers} members
+                  <span>
+                    {group.memberCount}
+                    {typeof group.maxMembers === "number" ? `/${group.maxMembers}` : ""} members
+                  </span>
                 </div>
                 {group.role && (
                   <div className="flex items-center gap-1">
@@ -532,47 +726,55 @@ export default function GroupManagementSystem() {
                 )}
               </div>
 
-              <div className="flex gap-2">
-                {group.isMember ? (
-                  <>
-                    <Button size="sm" className="flex-1">
-                      <MessageCircle className="h-4 w-4 mr-2" />
-                      Chat
+              <div className="flex flex-col gap-2">
+                <Button variant="outline" size="sm" onClick={() => handleOpenGroup(group)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Details
+                </Button>
+
+                <div className="flex gap-2">
+                  {group.isMember ? (
+                    <>
+                      <Button size="sm" className="flex-1">
+                        <MessageCircle className="mr-2 h-4 w-4" />
+                        Chat
+                      </Button>
+                      {!group.isOwner && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              Leave
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Leave Group</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to leave "{group.name}"? You'll need to request to join again.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleLeaveGroup(group)}>
+                                Leave Group
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </>
+                  ) : (
+                    <Button size="sm" className="flex-1" onClick={() => handleJoinGroup(group)}>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      {group.privacy === "invite-only" ? "Request to Join" : "Join Group"}
                     </Button>
-                    {!group.isOwner && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            Leave
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Leave Group</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to leave "{group.name}"? You'll need to request to join again.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleLeaveGroup(group.id)}>
-                              Leave Group
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                  </>
-                ) : (
-                  <Button size="sm" className="flex-1" onClick={() => handleJoinGroup(group.id)}>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    {group.privacy === "invite-only" ? "Request to Join" : "Join Group"}
-                  </Button>
-                )}
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
-        ))}
+        ))
+        )}
       </div>
 
       {/* Group Details Modal */}
@@ -593,65 +795,81 @@ export default function GroupManagementSystem() {
               </TabsList>
 
               <TabsContent value="members" className="space-y-4">
-                <div className="space-y-4">
-                  {groupMembers.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarImage src={member.user.avatar || "/placeholder.svg"} />
-                          <AvatarFallback>{member.user.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{member.user.name}</span>
-                            {getRoleIcon(member.role)}
-                            <Badge variant="outline" className="text-xs capitalize">
-                              {member.role}
-                            </Badge>
+                {isFetchingMembers ? (
+                  <div className="flex justify-center py-10">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : groupMembers.length > 0 ? (
+                  <div className="space-y-4">
+                    {groupMembers.map((member) => (
+                      <div key={member.id} className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={member.user.avatar || "/placeholder.svg"} />
+                            <AvatarFallback>{member.user.name?.charAt(0) ?? "?"}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{member.user.name}</span>
+                              {getRoleIcon(member.role)}
+                              <Badge variant="outline" className="text-xs capitalize">
+                                {member.role}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {member.user.email ?? "No email provided"}
+                            </p>
                           </div>
-                          <p className="text-sm text-muted-foreground">{member.user.email}</p>
                         </div>
+
+                        {selectedGroup.isOwner && member.role !== "owner" && (
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={member.role}
+                              disabled
+                              onValueChange={(value) => handleRoleChange(member.id, value)}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="member">Member</SelectItem>
+                                <SelectItem value="moderator">Moderator</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <UserMinus className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Remove Member</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Removing members requires backend support. This action is currently unavailable.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Close</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>
+                                    Acknowledge
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        )}
                       </div>
-
-                      {selectedGroup.isOwner && member.role !== "owner" && (
-                        <div className="flex items-center gap-2">
-                          <Select value={member.role} onValueChange={(value) => handleRoleChange(member.id, value)}>
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="member">Member</SelectItem>
-                              <SelectItem value="moderator">Moderator</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
-                            </SelectContent>
-                          </Select>
-
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <UserMinus className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Remove Member</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to remove {member.user.name} from the group?
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>
-                                  Remove
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                    No members found for this group yet.
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="events">
