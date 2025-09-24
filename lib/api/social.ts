@@ -7,6 +7,7 @@ import { apiClient } from "./client"
 import { API_ENDPOINTS } from "./endpoints"
 import type {
   SocialGroup,
+  SocialGroupDetail,
   PaginatedResponse,
   APIResponse,
 } from "./types"
@@ -27,8 +28,8 @@ export class SocialAPI {
   /**
    * Get group details
    */
-  async getGroup(groupId: number): Promise<SocialGroup> {
-    return apiClient.get<SocialGroup>(API_ENDPOINTS.social.groupDetail(groupId))
+  async getGroup(groupId: number): Promise<SocialGroupDetail> {
+    return apiClient.get<SocialGroupDetail>(API_ENDPOINTS.social.groupDetail(groupId))
   }
 
   /**
@@ -39,6 +40,10 @@ export class SocialAPI {
     description: string
     is_public: boolean
     category?: string
+    tags?: string[]
+    max_members?: number
+    privacy?: 'public' | 'private' | 'invite-only'
+    requires_invite?: boolean
   }): Promise<SocialGroup> {
     return apiClient.post<SocialGroup>(API_ENDPOINTS.social.groups, data)
   }

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { toast } from '@/hooks/use-toast'
+import { usersAPI } from '@/lib/api'
 import { 
   ComputerDesktopIcon,
   DevicePhoneMobileIcon,
@@ -51,10 +52,177 @@ const deviceIcons = {
   unknown: ComputerDesktopIcon
 }
 
+const generateSessionId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `session-${Math.random().toString(36).slice(2, 10)}`
+
+const guessBrowserFromUserAgent = (userAgent: string) => {
+  const ua = userAgent.toLowerCase()
+  if (ua.includes('edg')) return 'Microsoft Edge'
+  if (ua.includes('chrome') && !ua.includes('chromium')) return 'Chrome'
+  if (ua.includes('safari') && !ua.includes('chrome')) return 'Safari'
+  if (ua.includes('firefox')) return 'Firefox'
+  if (ua.includes('opr') || ua.includes('opera')) return 'Opera'
+  return 'Unknown Browser'
+}
+
+const guessOsFromUserAgent = (userAgent: string) => {
+  const ua = userAgent.toLowerCase()
+  if (ua.includes('windows nt')) return 'Windows'
+  if (ua.includes('mac os') || ua.includes('macintosh')) return 'macOS'
+  if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ios')) return 'iOS'
+  if (ua.includes('android')) return 'Android'
+  if (ua.includes('linux')) return 'Linux'
+  return 'Unknown OS'
+}
+
+const determineDeviceType = (session: any, userAgent: string): SessionData['deviceType'] => {
+  const candidate = `${session?.device_type ?? ''} ${session?.device ?? ''} ${userAgent}`.toLowerCase()
+  if (candidate.includes('mobile') || candidate.includes('iphone') || candidate.includes('android')) {
+    return 'mobile'
+  }
+  if (candidate.includes('tablet') || candidate.includes('ipad')) {
+    return 'tablet'
+  }
+  if (candidate.includes('tv') || candidate.includes('smart-tv')) {
+    return 'tv'
+  }
+  if (candidate.trim() === '') {
+    return 'unknown'
+  }
+  return 'desktop'
+}
+
+const parseLocation = (session: any): SessionData['location'] => {
+  const locationData = session?.location ?? session?.geo ?? session?.ip_location ?? session?.metadata?.location
+
+  const base: SessionData['location'] = {
+    city: 'Unknown',
+    region: '',
+    country: 'Unknown',
+    countryCode: ''
+  }
+
+  if (!locationData) {
+    return base
+  }
+
+  if (typeof locationData === 'string') {
+    const parts = locationData.split(',').map(part => part.trim()).filter(Boolean)
+    if (parts.length === 1) {
+      return {
+        ...base,
+        city: parts[0] || base.city,
+        country: parts[0] || base.country,
+        countryCode: session?.country_code ?? ''
+      }
+    }
+
+    if (parts.length === 2) {
+      return {
+        ...base,
+        city: parts[0] || base.city,
+        country: parts[1] || base.country,
+        countryCode: session?.country_code ?? ''
+      }
+    }
+
+    return {
+      city: parts[0] || base.city,
+      region: parts[1] || base.region,
+      country: parts[2] || base.country,
+      countryCode: session?.country_code ?? ''
+    }
+  }
+
+  if (typeof locationData === 'object' && locationData !== null) {
+    return {
+      city: locationData.city ?? locationData.town ?? base.city,
+      region: locationData.region ?? locationData.state ?? locationData.province ?? base.region,
+      country: locationData.country ?? locationData.country_name ?? locationData.code ?? base.country,
+      countryCode:
+        locationData.country_code ?? locationData.code ?? locationData.countryCode ?? session?.country_code ?? base.countryCode
+    }
+  }
+
+  return base
+}
+
+const resolveBrowser = (session: any, userAgent: string) => {
+  if (typeof session?.browser === 'string' && session.browser.trim().length > 0) {
+    return session.browser
+  }
+  if (typeof session?.client === 'string' && session.client.trim().length > 0) {
+    return session.client
+  }
+  if (typeof session?.device === 'string' && session.device.trim().length > 0) {
+    const [firstPart] = session.device.split(/ on /i)
+    if (firstPart) {
+      return firstPart
+    }
+  }
+  return guessBrowserFromUserAgent(userAgent)
+}
+
+const resolveOperatingSystem = (session: any, userAgent: string) => {
+  if (typeof session?.operating_system === 'string' && session.operating_system.trim().length > 0) {
+    return session.operating_system
+  }
+  if (typeof session?.os === 'string' && session.os.trim().length > 0) {
+    return session.os
+  }
+  if (typeof session?.platform === 'string' && session.platform.trim().length > 0) {
+    return session.platform
+  }
+  if (typeof session?.device === 'string' && session.device.includes(' on ')) {
+    const [, osPart] = session.device.split(/ on /i)
+    if (osPart) {
+      return osPart
+    }
+  }
+  return guessOsFromUserAgent(userAgent)
+}
+
+const determineSecurityState = (session: any) => {
+  if (typeof session?.is_secure === 'boolean') {
+    return session.is_secure
+  }
+  if (typeof session?.is_suspicious === 'boolean') {
+    return !session.is_suspicious
+  }
+  if (typeof session?.risk_level === 'string') {
+    const risk = session.risk_level.toLowerCase()
+    return !['high', 'critical'].includes(risk)
+  }
+  return true
+}
+
+const normalizeSession = (session: any): SessionData => {
+  const userAgent: string = session?.user_agent ?? session?.userAgent ?? ''
+  const loginTime = session?.login_time ?? session?.created_at ?? session?.logged_in_at ?? new Date().toISOString()
+  const lastActivity = session?.last_activity ?? session?.last_active_at ?? session?.updated_at ?? loginTime
+
+  return {
+    id: String(session?.id ?? session?.session_id ?? session?.key ?? generateSessionId()),
+    deviceType: determineDeviceType(session, userAgent),
+    browser: resolveBrowser(session, userAgent) || 'Unknown Browser',
+    operatingSystem: resolveOperatingSystem(session, userAgent) || 'Unknown OS',
+    ipAddress: session?.ip_address ?? session?.ip ?? 'Unknown IP',
+    location: parseLocation(session),
+    loginTime,
+    lastActivity,
+    isCurrent: Boolean(session?.is_current ?? session?.current ?? false),
+    isSecure: determineSecurityState(session),
+    userAgent: userAgent || 'Unknown user agent'
+  }
+}
+
 export default function SessionManagement({ userId, showRevealOptions = true }: SessionManagementProps) {
   const [sessions, setSessions] = useState<SessionData[]>([])
   const [loading, setLoading] = useState(true)
   const [revoking, setRevoking] = useState<string | null>(null)
+  const [revokingAll, setRevokingAll] = useState(false)
   const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>({})
 
   useEffect(() => {
@@ -62,84 +230,15 @@ export default function SessionManagement({ userId, showRevealOptions = true }: 
   }, [userId])
 
   const fetchSessions = async () => {
+    setLoading(true)
     try {
-      // Mock data - replace with actual API call
-      const mockSessions: SessionData[] = [
-        {
-          id: 'current-session',
-          deviceType: 'desktop',
-          browser: 'Chrome 120.0',
-          operatingSystem: 'Windows 11',
-          ipAddress: '192.168.1.100',
-          location: {
-            city: 'New York',
-            region: 'New York',
-            country: 'United States',
-            countryCode: 'US'
-          },
-          loginTime: '2024-01-15T09:00:00Z',
-          lastActivity: new Date().toISOString(),
-          isCurrent: true,
-          isSecure: true,
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        },
-        {
-          id: 'mobile-session-1',
-          deviceType: 'mobile',
-          browser: 'Safari 17.2',
-          operatingSystem: 'iOS 17.2',
-          ipAddress: '10.0.0.45',
-          location: {
-            city: 'New York',
-            region: 'New York',
-            country: 'United States',
-            countryCode: 'US'
-          },
-          loginTime: '2024-01-14T14:30:00Z',
-          lastActivity: '2024-01-15T08:45:00Z',
-          isCurrent: false,
-          isSecure: true,
-          userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X)'
-        },
-        {
-          id: 'suspicious-session',
-          deviceType: 'desktop',
-          browser: 'Firefox 121.0',
-          operatingSystem: 'Ubuntu 22.04',
-          ipAddress: '203.0.113.45',
-          location: {
-            city: 'London',
-            region: 'England',
-            country: 'United Kingdom',
-            countryCode: 'GB'
-          },
-          loginTime: '2024-01-13T22:15:00Z',
-          lastActivity: '2024-01-14T03:20:00Z',
-          isCurrent: false,
-          isSecure: false,
-          userAgent: 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0)'
-        },
-        {
-          id: 'tablet-session',
-          deviceType: 'tablet',
-          browser: 'Chrome 120.0',
-          operatingSystem: 'Android 14',
-          ipAddress: '192.168.1.105',
-          location: {
-            city: 'New York',
-            region: 'New York',
-            country: 'United States',
-            countryCode: 'US'
-          },
-          loginTime: '2024-01-12T16:20:00Z',
-          lastActivity: '2024-01-14T20:10:00Z',
-          isCurrent: false,
-          isSecure: true,
-          userAgent: 'Mozilla/5.0 (Linux; Android 14; SM-T970) AppleWebKit/537.36'
-        }
-      ]
-      
-      setSessions(mockSessions)
+      if (typeof usersAPI?.getSessions !== 'function') {
+        throw new Error('Session service unavailable')
+      }
+
+      const response = await usersAPI.getSessions()
+      const normalized = Array.isArray(response) ? response.map(normalizeSession) : []
+      setSessions(normalized)
     } catch (error) {
       console.error('Failed to fetch sessions:', error)
       toast({
@@ -147,13 +246,15 @@ export default function SessionManagement({ userId, showRevealOptions = true }: 
         description: 'Failed to load session data',
         variant: 'destructive'
       })
+      setSessions([])
     } finally {
       setLoading(false)
     }
   }
 
   const revokeSession = async (sessionId: string) => {
-    if (sessionId === 'current-session') {
+    const targetSession = sessions.find(session => session.id === sessionId)
+    if (targetSession?.isCurrent) {
       toast({
         title: 'Cannot Revoke',
         description: 'You cannot revoke your current session',
@@ -164,16 +265,20 @@ export default function SessionManagement({ userId, showRevealOptions = true }: 
 
     setRevoking(sessionId)
     try {
-      // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
+      if (typeof usersAPI?.deleteSession !== 'function') {
+        throw new Error('Session service unavailable')
+      }
+
+      await usersAPI.deleteSession(sessionId)
+
       setSessions(prev => prev.filter(session => session.id !== sessionId))
-      
+
       toast({
         title: 'Session Revoked',
         description: 'The session has been successfully terminated',
       })
     } catch (error) {
+      console.error('Failed to revoke session:', error)
       toast({
         title: 'Error',
         description: 'Failed to revoke session',
@@ -195,21 +300,29 @@ export default function SessionManagement({ userId, showRevealOptions = true }: 
     }
 
     try {
-      // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
+      setRevokingAll(true)
+
+      if (typeof usersAPI?.revokeAllSessions !== 'function') {
+        throw new Error('Session service unavailable')
+      }
+
+      await usersAPI.revokeAllSessions()
+
       setSessions(prev => prev.filter(session => session.isCurrent))
-      
+
       toast({
         title: 'Sessions Revoked',
         description: `${otherSessions.length} session(s) have been terminated`,
       })
     } catch (error) {
+      console.error('Failed to revoke sessions:', error)
       toast({
         title: 'Error',
         description: 'Failed to revoke sessions',
         variant: 'destructive'
       })
+    } finally {
+      setRevokingAll(false)
     }
   }
 
@@ -319,8 +432,8 @@ export default function SessionManagement({ userId, showRevealOptions = true }: 
             {sessions.filter(s => !s.isCurrent).length > 0 && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm">
-                    Revoke All Others
+                  <Button variant="destructive" size="sm" disabled={revokingAll}>
+                    {revokingAll ? 'Revoking...' : 'Revoke All Others'}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="bg-black/90 border-white/20">
@@ -332,11 +445,12 @@ export default function SessionManagement({ userId, showRevealOptions = true }: 
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction 
+                    <AlertDialogAction
                       onClick={revokeAllOtherSessions}
                       className="bg-red-600 hover:bg-red-700"
+                      disabled={revokingAll}
                     >
-                      Revoke All
+                      {revokingAll ? 'Revoking...' : 'Revoke All'}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -471,11 +585,12 @@ export default function SessionManagement({ userId, showRevealOptions = true }: 
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction 
+                                <AlertDialogAction
                                   onClick={() => revokeSession(session.id)}
                                   className="bg-red-600 hover:bg-red-700"
+                                  disabled={revoking === session.id}
                                 >
-                                  Revoke Session
+                                  {revoking === session.id ? 'Revoking...' : 'Revoke Session'}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>

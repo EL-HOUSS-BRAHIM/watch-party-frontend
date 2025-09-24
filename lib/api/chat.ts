@@ -9,6 +9,7 @@ import type {
   ChatMessage,
   ChatSettings,
   ChatUser,
+  ChatActiveUsersResponse,
   ModerationLog,
   ChatStats,
   PaginatedResponse,
@@ -81,8 +82,27 @@ export class ChatAPI {
   /**
    * Get active users in chat room
    */
-  async getActiveUsers(roomId: string): Promise<ChatUser[]> {
-    return apiClient.get<ChatUser[]>(API_ENDPOINTS.chat.activeUsers(roomId))
+  async getActiveUsers(roomId: string): Promise<ChatActiveUsersResponse> {
+    const response = await apiClient.get(API_ENDPOINTS.chat.activeUsers(roomId))
+
+    if (Array.isArray(response)) {
+      return {
+        active_users: response as ChatUser[],
+        total_active: response.length,
+      }
+    }
+
+    if (response && Array.isArray(response.active_users)) {
+      return {
+        active_users: response.active_users as ChatUser[],
+        total_active: Number(response.total_active ?? response.active_users.length ?? 0),
+      }
+    }
+
+    return {
+      active_users: [],
+      total_active: Number(response?.total_active ?? 0),
+    }
   }
 
   // === CHAT MODERATION ===

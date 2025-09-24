@@ -186,6 +186,13 @@ export interface DiscoverContent {
 }
 
 // Social Types
+export interface SocialGroupMembership {
+  role?: 'owner' | 'admin' | 'moderator' | 'member'
+  status?: string
+  joined_at?: string
+  last_active?: string
+}
+
 export interface SocialGroup {
   id: number
   name: string
@@ -195,6 +202,31 @@ export interface SocialGroup {
   created_at: string
   owner: User
   is_member: boolean
+  is_owner?: boolean
+  avatar?: string
+  image?: string
+  category?: string
+  tags?: string[]
+  max_members?: number
+  privacy?: 'public' | 'private' | 'invite-only'
+  requires_invite?: boolean
+  membership?: SocialGroupMembership
+}
+
+export interface SocialGroupMember {
+  id: number | string
+  user: User
+  role?: 'owner' | 'admin' | 'moderator' | 'member'
+  joined_at?: string
+  last_active?: string
+  status?: string
+  is_active?: boolean
+  is_banned?: boolean
+}
+
+export interface SocialGroupDetail extends SocialGroup {
+  members?: SocialGroupMember[]
+  pending_members?: SocialGroupMember[]
 }
 
 // Messaging Types
@@ -352,9 +384,18 @@ export interface ContentType {
 export interface ChatUser {
   id: string
   username: string
-  avatar?: string
-  is_moderator: boolean
-  is_online: boolean
+  avatar?: string | null
+  avatar_url?: string | null
+  display_name?: string
+  is_moderator?: boolean
+  is_online?: boolean
+  last_seen?: string
+  is_typing?: boolean
+}
+
+export interface ChatActiveUsersResponse {
+  active_users: ChatUser[]
+  total_active: number
 }
 
 export interface ModerationLog {
