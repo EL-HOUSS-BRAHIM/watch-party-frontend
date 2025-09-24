@@ -144,6 +144,9 @@ export const API_ENDPOINTS = {
     
     // Video Proxy
     proxy: (videoId: string) => `/api/videos/${videoId}/proxy/`,
+    
+    // Processing Jobs (Admin)
+    processingJobs: '/api/videos/processing-jobs/',
   },
 
   // Parties endpoints - Enhanced with advanced features and invitations

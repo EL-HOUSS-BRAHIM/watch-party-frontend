@@ -115,7 +115,7 @@ const normalizeGroupMember = (member: any): GroupMember => {
   const firstName = memberUser?.first_name ?? memberUser?.firstName
   const lastName = memberUser?.last_name ?? memberUser?.lastName
   const composedName = [firstName, lastName].filter(Boolean).join(" ")
-  const name = memberUser?.name ?? memberUser?.full_name ?? memberUser?.username ?? composedName || "Member"
+  const name = (memberUser?.name ?? memberUser?.full_name ?? memberUser?.username ?? composedName) || "Member"
 
   return {
     id: String(member?.id ?? memberUser?.id ?? fallbackId("member")),
@@ -149,7 +149,7 @@ const normalizeGroup = (group: any): Group => {
   const owner = group?.owner ?? group?.created_by ?? {}
   const firstName = owner?.first_name ?? owner?.firstName
   const lastName = owner?.last_name ?? owner?.lastName
-  const ownerName = owner?.name ?? owner?.full_name ?? owner?.username ?? [firstName, lastName].filter(Boolean).join(" ") || "Group Owner"
+  const ownerName = (owner?.name ?? owner?.full_name ?? owner?.username ?? [firstName, lastName].filter(Boolean).join(" ")) || "Group Owner"
   const membership = group?.membership ?? {}
   const tags = Array.isArray(group?.tags)
     ? group.tags.map((tag: any) => String(tag))

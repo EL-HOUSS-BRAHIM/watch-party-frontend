@@ -392,6 +392,57 @@ export class VideosAPI {
   async getProxyUrl(videoId: string): Promise<{ proxy_url: string; expires_at: string }> {
     return apiClient.get(API_ENDPOINTS.videos.proxy(videoId))
   }
+
+  /**
+   * Get processing jobs (Admin only)
+   * Note: This is a placeholder implementation that transforms video data into processing job format
+   * until the backend implements a dedicated processing jobs endpoint
+   */
+  async getProcessingJobs(): Promise<Array<{
+    id: string
+    filename: string
+    original_size: number
+    status: string
+    progress: number
+    started_at: string
+    completed_at?: string
+    tasks: Array<any>
+    output_files: Array<any>
+    metadata: any
+  }>> {
+    try {
+      // For now, we'll use the admin videos endpoint or regular videos endpoint
+      // and transform the data to match the expected processing job format
+      const videos = await this.getVideos({ ordering: '-created_at' })
+      
+      // Transform video data into processing job format
+      return videos.results?.map((video: any) => ({
+        id: video.id,
+        filename: video.title || video.filename || 'Unknown',
+        original_size: video.file_size || 0,
+        status: video.status || 'completed', // Most videos are completed if they're in the list
+        progress: video.status === 'processing' ? (video.progress || 50) : 100,
+        started_at: video.created_at || new Date().toISOString(),
+        completed_at: video.status === 'completed' ? video.updated_at : undefined,
+        tasks: [], // Empty for now since backend doesn't provide task details
+        output_files: video.quality_variants || [],
+        metadata: {
+          duration: video.duration || 0,
+          resolution: video.resolution || 'Unknown',
+          bitrate: video.bitrate || 0,
+          codec: video.codec || 'Unknown',
+          fps: video.fps || 0,
+          aspect_ratio: video.aspect_ratio || 'Unknown',
+          audio_codec: video.audio_codec || 'Unknown',
+          audio_channels: video.audio_channels || 0
+        }
+      })) || []
+    } catch (error) {
+      console.error('Failed to fetch processing jobs:', error)
+      // Return empty array on error
+      return []
+    }
+  }
 }
 
 // Export the class but don't instantiate it immediately

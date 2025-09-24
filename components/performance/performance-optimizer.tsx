@@ -85,8 +85,6 @@ interface BundleAnalysis {
   }>
 }
 
-}
-
 const mockSuggestions: OptimizationSuggestion[] = [
   {
     id: "1",
@@ -159,10 +157,19 @@ export function PerformanceOptimizer() {
   const [bundleAnalysis, setBundleAnalysis] = useState<BundleAnalysis | null>(null)
   const [historicalData, setHistoricalData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [selectedMetric, setSelectedMetric] = useState("performance")
   const [optimizationDialogOpen, setOptimizationDialogOpen] = useState(false)
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
   const [selectedSuggestion, setSelectedSuggestion] = useState<OptimizationSuggestion | null>(null)
+  const [optimizationSettings, setOptimizationSettings] = useState({
+    imageOptimization: false,
+    codeSplitting: false,
+    caching: false,
+    compression: false
+  })
   const { toast } = useToast()
 
   const normalizeMetric = (metric: any): PerformanceMetric => {
@@ -258,7 +265,7 @@ export function PerformanceOptimizer() {
       setLoading(true)
       
       const [systemPerformance, dashboardData] = await Promise.allSettled([
-        analyticsAPI.getSystemPerformance(),
+        analyticsAPI.getSystemAnalytics(),
         analyticsAPI.getDashboard('performance')
       ])
 
@@ -341,107 +348,6 @@ export function PerformanceOptimizer() {
       setLoading(false)
     }
   }, [toast])
-
-  const fetchPerformanceData = async () => {
-    setIsLoading(true)
-    try {
-      // Fetch performance analytics from API
-      const performanceData = await analyticsAPI.getPerformanceAnalytics()
-
-      // Transform performance metrics
-      const transformedMetrics: PerformanceMetric[] = [
-        {
-          name: "First Contentful Paint",
-          value: performanceData.web_vitals?.fcp || 1.2,
-          target: 1.8,
-          unit: "s",
-          status: (performanceData.web_vitals?.fcp || 1.2) <= 1.8 ? "good" : 
-                  (performanceData.web_vitals?.fcp || 1.2) <= 3.0 ? "needs-improvement" : "poor",
-          trend: performanceData.trends?.fcp_trend || "stable",
-          description: "Time until the first content is painted",
-        },
-        {
-          name: "Largest Contentful Paint",
-          value: performanceData.web_vitals?.lcp || 2.5,
-          target: 2.5,
-          unit: "s",
-          status: (performanceData.web_vitals?.lcp || 2.5) <= 2.5 ? "good" : 
-                  (performanceData.web_vitals?.lcp || 2.5) <= 4.0 ? "needs-improvement" : "poor",
-          trend: performanceData.trends?.lcp_trend || "stable",
-          description: "Time until the largest content element is rendered",
-        },
-        {
-          name: "Bundle Size",
-          value: performanceData.bundle?.total_size || 250,
-          target: 200,
-          unit: "KB",
-          status: (performanceData.bundle?.total_size || 250) <= 200 ? "good" : 
-                  (performanceData.bundle?.total_size || 250) <= 300 ? "needs-improvement" : "poor",
-          trend: performanceData.trends?.bundle_trend || "up",
-          description: "Total JavaScript bundle size",
-        },
-        {
-          name: "API Response Time",
-          value: performanceData.api?.avg_response_time || 150,
-          target: 200,
-          unit: "ms",
-          status: (performanceData.api?.avg_response_time || 150) <= 200 ? "good" : 
-                  (performanceData.api?.avg_response_time || 150) <= 500 ? "needs-improvement" : "poor",
-          trend: performanceData.trends?.api_trend || "stable",
-          description: "Average API response time",
-        },
-      ]
-
-      // Create default suggestions if none provided by API
-      const defaultSuggestions: OptimizationSuggestion[] = performanceData.suggestions || [
-        {
-          id: "image-optimization",
-          category: "images",
-          title: "Enable Image Optimization",
-          description: "Compress and optimize images to reduce bundle size",
-          impact: "medium",
-          effort: "low",
-          implemented: optimizationSettings.imageOptimization,
-          estimatedImprovement: "15-20% faster load times",
-        },
-        {
-          id: "code-splitting",
-          category: "code",
-          title: "Implement Code Splitting",
-          description: "Split your bundle into smaller chunks loaded on demand",
-          impact: "high",
-          effort: "medium",
-          implemented: optimizationSettings.codeSplitting,
-          estimatedImprovement: "30-40% faster initial load",
-        },
-      ]
-
-      // Transform bundle analysis
-      const transformedBundleAnalysis: BundleAnalysis = {
-        totalSize: performanceData.bundle?.total_size || 250,
-        gzippedSize: performanceData.bundle?.gzipped_size || 85,
-        chunks: performanceData.bundle?.chunks || [
-          { name: "main", size: 120, modules: 45 },
-          { name: "vendor", size: 95, modules: 23 },
-          { name: "polyfills", size: 35, modules: 12 },
-        ],
-        duplicates: performanceData.bundle?.duplicates || [],
-      }
-
-      setMetrics(transformedMetrics)
-      setSuggestions(defaultSuggestions)
-      setBundleAnalysis(transformedBundleAnalysis)
-    } catch (error) {
-      console.error('Failed to fetch performance data:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load performance data. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const runPerformanceAnalysis = useCallback(async () => {
     setIsAnalyzing(true)
@@ -762,16 +668,16 @@ export function PerformanceOptimizer() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span>Total Size</span>
-                    <span className="font-medium">{formatBytes(bundleAnalysis.totalSize)}</span>
+                    <span className="font-medium">{formatBytes(bundleAnalysis?.totalSize || 0)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Gzipped Size</span>
-                    <span className="font-medium text-green-600">{formatBytes(bundleAnalysis.gzippedSize)}</span>
+                    <span className="font-medium text-green-600">{formatBytes(bundleAnalysis?.gzippedSize || 0)}</span>
                   </div>
                   <div className="pt-4">
                     <h4 className="font-medium mb-2">Chunks</h4>
                     <div className="space-y-2">
-                      {bundleAnalysis.chunks.map((chunk) => (
+                      {bundleAnalysis?.chunks?.map((chunk) => (
                         <div key={chunk.name} className="flex justify-between items-center text-sm">
                           <span>{chunk.name}</span>
                           <div className="flex items-center gap-2">
@@ -793,7 +699,7 @@ export function PerformanceOptimizer() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {bundleAnalysis.duplicates.map((duplicate) => (
+                  {bundleAnalysis?.duplicates?.map((duplicate) => (
                     <div key={duplicate.module} className="flex justify-between items-center p-3 border rounded-lg">
                       <div>
                         <h4 className="font-medium">{duplicate.module}</h4>
@@ -817,7 +723,7 @@ export function PerformanceOptimizer() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={bundleAnalysis.chunks}>
+                <BarChart data={bundleAnalysis?.chunks || []}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis tickFormatter={(value) => formatBytes(value)} />

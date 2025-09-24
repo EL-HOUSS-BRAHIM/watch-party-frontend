@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Badge } from   const filteredJobs = jobs.filter((job) => filterStatus === \"all\" || job.status === filterStatus)\n\n  if (loading) {\n    return (\n      <div className=\"space-y-6\">\n        <div className=\"flex items-center justify-center p-8\">\n          <div className=\"animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600\"></div>\n          <span className=\"ml-2 text-gray-600\">Loading processing jobs...</span>\n        </div>\n      </div>\n    )\n  }@/components/ui/badge"
+import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -89,8 +89,6 @@ interface ProcessingSettings {
   enableMetadataExtraction: boolean
   enableContentAnalysis: boolean
   outputFormats: string[]
-}
-
 }
 
 const mockSettings: ProcessingSettings = {
@@ -226,7 +224,8 @@ export function VideoProcessingPipeline() {
     setLoading(true)
     try {
       const response = await videosAPI.getProcessingJobs()
-      const jobsData = Array.isArray(response) ? response : Array.isArray(response?.jobs) ? response.jobs : []
+      // The API now returns an array directly
+      const jobsData = Array.isArray(response) ? response : []
       setJobs(jobsData.map(normalizeProcessingJob))
     } catch (error) {
       console.error('Failed to fetch processing jobs:', error)
