@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -39,8 +39,9 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { usersAPI } from "@/lib/api"
+import { socialAPI, usersAPI } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
 interface User {
   id: string
@@ -53,6 +54,7 @@ interface User {
   commonInterests: string[]
   location?: string
   joinedDate: string
+  friendshipStatus?: "none" | "pending_sent" | "pending_received" | "friends" | "blocked"
   stats: {
     partiesHosted: number
     partiesJoined: number
@@ -63,6 +65,7 @@ interface User {
 
 interface Community {
   id: string
+  numericId?: number
   name: string
   description: string
   memberCount: number
@@ -103,135 +106,167 @@ interface Achievement {
   }
 }
 
-const mockUsers: User[] = [
-  {
-    id: "1",
-    username: "moviebuff2024",
-    displayName: "Alex Chen",
-    avatar: "/placeholder-user.jpg",
-    isOnline: true,
-    lastSeen: "now",
-    mutualFriends: 12,
-    commonInterests: ["Action Movies", "Sci-Fi", "Horror"],
-    location: "San Francisco, CA",
-    joinedDate: "2023-06-15",
-    stats: {
-      partiesHosted: 45,
-      partiesJoined: 128,
-      friendsCount: 89,
-      watchTime: 2400,
-    },
-  },
-  {
-    id: "2",
-    username: "cinephile_sarah",
-    displayName: "Sarah Johnson",
-    avatar: "/placeholder-user.jpg",
-    isOnline: false,
-    lastSeen: "2 hours ago",
-    mutualFriends: 8,
-    commonInterests: ["Documentaries", "Foreign Films", "Indie"],
-    location: "New York, NY",
-    joinedDate: "2023-03-22",
-    stats: {
-      partiesHosted: 23,
-      partiesJoined: 67,
-      friendsCount: 156,
-      watchTime: 1800,
-    },
-  },
-]
+const fallbackId = (prefix: string) =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? `${prefix}-${crypto.randomUUID()}`
+    : `${prefix}-${Math.random().toString(36).slice(2, 10)}`
 
-const mockCommunities: Community[] = [
-  {
-    id: "1",
-    name: "Horror Movie Enthusiasts",
-    description: "For fans of spine-chilling horror films and thrillers",
-    memberCount: 2847,
-    category: "Genre",
-    isPrivate: false,
-    avatar: "/placeholder.svg?height=40&width=40&text=HME",
-    tags: ["Horror", "Thriller", "Suspense"],
-    createdBy: "horror_master",
-    createdAt: "2023-01-15",
-    recentActivity: "New discussion: Best Horror Films of 2024",
-  },
-  {
-    id: "2",
-    name: "Anime Watch Parties",
-    description: "Weekly anime watch parties and discussions",
-    memberCount: 5632,
-    category: "Genre",
-    isPrivate: false,
-    avatar: "/placeholder.svg?height=40&width=40&text=AWP",
-    tags: ["Anime", "Manga", "Japanese Culture"],
-    createdBy: "otaku_leader",
-    createdAt: "2022-11-08",
-    recentActivity: "Scheduled: Attack on Titan finale watch party",
-  },
-]
+const normalizeStats = (stats?: any, source?: any) => ({
+  partiesHosted:
+    stats?.parties_hosted ?? stats?.hosted ?? stats?.partiesHosted ?? source?.parties_hosted ?? source?.hosted ?? 0,
+  partiesJoined:
+    stats?.parties_joined ?? stats?.joined ?? stats?.partiesJoined ?? source?.parties_joined ?? source?.joined ?? 0,
+  friendsCount:
+    stats?.friends_count ?? stats?.friends ?? stats?.friendsCount ?? source?.friends_count ?? source?.friends ?? 0,
+  watchTime: stats?.watch_time ?? stats?.watchTime ?? source?.watch_time ?? source?.watchTime ?? 0,
+})
 
-const mockActivityFeed: ActivityFeedItem[] = [
-  {
-    id: "1",
-    type: "party_created",
-    user: mockUsers[0],
-    content: "Created a new watch party for 'Dune: Part Two'",
-    timestamp: "2024-01-28T14:30:00Z",
-    likes: 24,
-    comments: 8,
-    isLiked: false,
-    metadata: { partyId: "party123", movieTitle: "Dune: Part Two" },
-  },
-  {
-    id: "2",
-    type: "achievement_earned",
-    user: mockUsers[1],
-    content: "Earned the 'Social Butterfly' achievement for making 100 friends!",
-    timestamp: "2024-01-28T13:15:00Z",
-    likes: 67,
-    comments: 15,
-    isLiked: true,
-    metadata: { achievementId: "social_butterfly" },
-  },
-]
+const normalizeUser = (friend: any): User => ({
+  id: String(friend?.id ?? friend?.user_id ?? friend?.username ?? fallbackId("user")),
+  username: friend?.username ?? friend?.handle ?? friend?.user?.username ?? "user",
+  displayName:
+    friend?.display_name ??
+    friend?.name ??
+    friend?.full_name ??
+    friend?.user?.display_name ??
+    friend?.username ??
+    "User",
+  avatar:
+    friend?.avatar_url ??
+    friend?.avatar ??
+    friend?.profile_image ??
+    friend?.user?.avatar ??
+    "/placeholder-user.jpg",
+  isOnline: Boolean(friend?.is_online ?? friend?.online ?? friend?.status === "online"),
+  lastSeen: friend?.last_seen ?? friend?.last_activity ?? friend?.user?.last_seen ?? new Date().toISOString(),
+  mutualFriends: friend?.mutual_friends_count ?? friend?.mutualFriends ?? friend?.mutual_friends ?? 0,
+  commonInterests: Array.isArray(friend?.common_interests)
+    ? friend.common_interests
+    : Array.isArray(friend?.interests)
+      ? friend.interests
+      : Array.isArray(friend?.genres)
+        ? friend.genres
+        : [],
+  location: friend?.location ?? friend?.city ?? friend?.user?.location,
+  joinedDate: friend?.joined_at ?? friend?.created_at ?? friend?.user?.joined_at ?? new Date().toISOString(),
+  friendshipStatus: friend?.friendship_status ?? friend?.status ?? "none",
+  stats: normalizeStats(friend?.stats, friend),
+})
 
-const mockAchievements: Achievement[] = [
-  {
-    id: "1",
-    name: "First Steps",
-    description: "Join your first watch party",
-    icon: "🎬",
-    category: "milestone",
-    rarity: "common",
-    progress: 1,
-    maxProgress: 1,
-    unlockedAt: "2024-01-15T10:00:00Z",
-    reward: { type: "badge", value: "Newcomer" },
+const normalizeCommunity = (group: any): Community => {
+  const tags = Array.isArray(group?.tags)
+    ? group.tags
+    : Array.isArray(group?.topics)
+      ? group.topics
+      : []
+
+  const category = (group?.category ?? group?.type ?? "general").toString()
+  const rawId = group?.id ?? group?.uuid ?? fallbackId("community")
+  const numericCandidate = typeof rawId === "number" ? rawId : Number(rawId)
+  const numericId = typeof numericCandidate === "number" && !Number.isNaN(numericCandidate)
+    ? numericCandidate
+    : undefined
+
+  return {
+    id: String(rawId),
+    numericId,
+    name: group?.name ?? group?.title ?? "Community",
+    description: group?.description ?? group?.summary ?? "No description provided yet.",
+    memberCount:
+      group?.member_count ??
+      group?.members_count ??
+      (Array.isArray(group?.members) ? group.members.length : 0),
+    category,
+    isPrivate: Boolean(group?.is_private ?? group?.privacy === "private"),
+    avatar: group?.avatar_url ?? group?.image ?? "/placeholder.svg",
+    tags,
+    createdBy: group?.owner?.username ?? group?.creator?.username ?? group?.owner_name ?? "Unknown",
+    createdAt: group?.created_at ?? new Date().toISOString(),
+    recentActivity:
+      group?.recent_activity ??
+      group?.latest_post ??
+      `Active members: ${
+        group?.member_count ??
+        group?.members_count ??
+        (Array.isArray(group?.members) ? group.members.length : 0)
+      }`,
+  }
+}
+
+const formatActivityContent = (activity: any): string => {
+  if (!activity) {
+    return "New activity"
+  }
+
+  if (typeof activity.content === "string") {
+    return activity.content
+  }
+
+  if (activity.content && typeof activity.content === "object") {
+    if (typeof activity.content.title === "string") {
+      return activity.content.title
+    }
+
+    if (typeof activity.content.description === "string") {
+      return activity.content.description
+    }
+  }
+
+  if (typeof activity.message === "string") {
+    return activity.message
+  }
+
+  if (typeof activity.summary === "string") {
+    return activity.summary
+  }
+
+  const metadata = activity.metadata ?? {}
+
+  if (metadata.party_name) {
+    return `Created a watch party${metadata.party_name ? ` "${metadata.party_name}"` : ""}`
+  }
+
+  if (metadata.video_title) {
+    return `Shared the video "${metadata.video_title}"`
+  }
+
+  if (metadata.friend_name) {
+    return `Added ${metadata.friend_name}`
+  }
+
+  return "Shared an update"
+}
+
+const normalizeActivity = (activity: any): ActivityFeedItem => ({
+  id: String(activity?.id ?? activity?.activity_id ?? fallbackId("activity")),
+  type:
+    (activity?.activity_type ??
+      activity?.type ??
+      "video_shared") as ActivityFeedItem["type"],
+  user: normalizeUser(activity?.user ?? {}),
+  content: formatActivityContent(activity),
+  timestamp: activity?.created_at ?? activity?.timestamp ?? new Date().toISOString(),
+  likes: activity?.like_count ?? activity?.likes ?? 0,
+  comments: activity?.comment_count ?? activity?.comments ?? 0,
+  isLiked: Boolean(activity?.is_liked ?? activity?.liked),
+  metadata: activity?.metadata ?? {},
+})
+
+const normalizeAchievement = (achievement: any): Achievement => ({
+  id: String(achievement?.id ?? achievement?.slug ?? fallbackId("achievement")),
+  name: achievement?.name ?? achievement?.title ?? "Achievement",
+  description: achievement?.description ?? achievement?.summary ?? "",
+  icon: achievement?.icon ?? achievement?.emoji ?? "🏆",
+  category: (achievement?.category ?? "engagement") as Achievement["category"],
+  rarity: (achievement?.rarity ?? "common") as Achievement["rarity"],
+  progress: achievement?.progress ?? achievement?.current_progress ?? 0,
+  maxProgress: achievement?.max_progress ?? achievement?.total_required ?? achievement?.goal ?? 1,
+  unlockedAt: achievement?.unlocked_at ?? achievement?.completed_at,
+  reward: {
+    type: achievement?.reward?.type ?? "badge",
+    value: achievement?.reward?.value ?? achievement?.reward ?? "Reward",
   },
-  {
-    id: "2",
-    name: "Social Butterfly",
-    description: "Make 100 friends on the platform",
-    icon: "🦋",
-    category: "social",
-    rarity: "rare",
-    progress: 89,
-    maxProgress: 100,
-    reward: { type: "title", value: "Social Butterfly" },
-  },
-  {
-    id: "3",
-    name: "Movie Marathon Master",
-    description: "Host 50 watch parties",
-    icon: "🏆",
-    category: "content",
-    rarity: "epic",
-    progress: 23,
-    maxProgress: 50,
-    reward: { type: "feature", value: "Custom Party Themes" },
-  },
-]
+})
 
 export function EnhancedSocialFeatures() {
   const [users, setUsers] = useState<User[]>([])
@@ -253,99 +288,59 @@ export function EnhancedSocialFeatures() {
   const fetchSocialData = async () => {
     setLoading(true)
     try {
-      // Fetch social data from API
-      const [friendsData, communitiesData, activityData, achievementsData] = await Promise.all([
-        usersAPI.getFriends(),
-        // Mock API calls for now - these would be actual API endpoints
-        Promise.resolve({ results: [] }),
-        Promise.resolve({ results: [] }),
-        Promise.resolve({ results: [] })
-      ])
+      const [friendsResult, suggestionsResult, communitiesResult, activityResult, achievementsResult] =
+        await Promise.allSettled([
+          usersAPI.getFriends({ limit: 20 }),
+          usersAPI.getFriendSuggestions({ limit: 20 }),
+          socialAPI.getGroups({ page: 1, public_only: true }),
+          usersAPI.getActivity({ page: 1 }),
+          usersAPI.getAchievements(),
+        ])
 
-      // Transform API data to component format
-      const transformedUsers: User[] = (friendsData.results || []).map((friend: any) => ({
-        id: friend.id,
-        username: friend.username,
-        displayName: friend.display_name || friend.username,
-        avatar: friend.avatar_url || '/placeholder-user.jpg',
-        isOnline: friend.is_online || false,
-        lastSeen: friend.last_seen || new Date().toISOString(),
-        mutualFriends: friend.mutual_friends_count || 0,
-        commonInterests: friend.common_interests || [],
-        location: friend.location,
-        joinedDate: friend.created_at,
-        stats: {
-          partiesHosted: friend.stats?.parties_hosted || 0,
-          partiesJoined: friend.stats?.parties_joined || 0,
-          friendsCount: friend.stats?.friends_count || 0,
-          watchTime: friend.stats?.watch_time || 0,
-        }
-      })) || []
+      const combinedUsers = new Map<string, User>()
 
-      const transformedCommunities: Community[] = (communitiesData.results || []).map((community: any) => ({
-        id: community.id,
-        name: community.name,
-        description: community.description,
-        memberCount: community.member_count,
-        category: community.category,
-        isPrivate: community.is_private,
-        avatar: community.avatar_url || '/placeholder.jpg',
-        tags: community.tags || [],
-        createdBy: community.creator?.username || 'Unknown',
-        createdAt: community.created_at,
-        recentActivity: community.recent_activity || 'No recent activity'
-      })) || []
+      if (friendsResult.status === "fulfilled") {
+        const friendResults = friendsResult.value?.results ?? []
+        friendResults.forEach((friend: any) => {
+          const normalized = normalizeUser(friend)
+          combinedUsers.set(normalized.id, normalized)
+        })
+      }
 
-      const transformedActivityFeed: ActivityFeedItem[] = (activityData.results || []).map((activity: any) => ({
-        id: activity.id,
-        type: activity.activity_type,
-        user: {
-          id: activity.user.id,
-          username: activity.user.username,
-          displayName: activity.user.display_name || activity.user.username,
-          avatar: activity.user.avatar_url || '/placeholder-user.jpg',
-          isOnline: activity.user.is_online || false,
-          lastSeen: activity.user.last_seen || new Date().toISOString(),
-          mutualFriends: 0,
-          commonInterests: [],
-          joinedDate: activity.user.created_at,
-          stats: {
-            partiesHosted: 0,
-            partiesJoined: 0,
-            friendsCount: 0,
-            watchTime: 0,
+      if (suggestionsResult.status === "fulfilled") {
+        const suggestions = suggestionsResult.value ?? []
+        suggestions.forEach((friend: any) => {
+          const normalized = normalizeUser(friend)
+          if (!combinedUsers.has(normalized.id)) {
+            combinedUsers.set(normalized.id, normalized)
           }
-        },
-        content: activity.content,
-        timestamp: activity.created_at,
-        likes: activity.like_count || 0,
-        comments: activity.comment_count || 0,
-        isLiked: activity.is_liked || false,
-        metadata: activity.metadata
-      })) || []
+        })
+      }
 
-      const transformedAchievements: Achievement[] = (achievementsData.results || []).map((achievement: any) => ({
-        id: achievement.id,
-        name: achievement.name,
-        description: achievement.description,
-        icon: achievement.icon || 'trophy',
-        category: achievement.category,
-        rarity: achievement.rarity,
-        progress: achievement.progress,
-        maxProgress: achievement.max_progress,
-        unlockedAt: achievement.unlocked_at,
-        reward: {
-          type: achievement.reward?.type || 'badge',
-          value: achievement.reward?.value || 'Achievement Badge'
-        }
-      })) || []
+      setUsers(Array.from(combinedUsers.values()))
 
-      setUsers(transformedUsers)
-      setCommunities(transformedCommunities)
-      setActivityFeed(transformedActivityFeed)
-      setAchievements(transformedAchievements)
+      if (communitiesResult.status === "fulfilled") {
+        const communityResults = communitiesResult.value?.results ?? []
+        setCommunities(communityResults.map((community: any) => normalizeCommunity(community)))
+      } else {
+        setCommunities([])
+      }
+
+      if (activityResult.status === "fulfilled") {
+        const activityResults = activityResult.value?.results ?? []
+        setActivityFeed(activityResults.map((activity: any) => normalizeActivity(activity)))
+      } else {
+        setActivityFeed([])
+      }
+
+      if (achievementsResult.status === "fulfilled") {
+        const achievementResults = achievementsResult.value ?? []
+        setAchievements(achievementResults.map((achievement: any) => normalizeAchievement(achievement)))
+      } else {
+        setAchievements([])
+      }
     } catch (error) {
-      console.error('Failed to fetch social data:', error)
+      console.error("Failed to fetch social data:", error)
       toast({
         title: "Error",
         description: "Failed to load social data. Please try again.",
@@ -383,17 +378,61 @@ export function EnhancedSocialFeatures() {
     }
   }
 
-  const handleFollowUser = (userId: string) => {
-    // Implement follow user logic
-    console.log("Following user:", userId)
+  const handleFollowUser = async (userId: string) => {
+    try {
+      await usersAPI.sendFriendRequestToUser(userId)
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId
+            ? {
+                ...user,
+                friendshipStatus: "pending_sent",
+              }
+            : user,
+        ),
+      )
+      toast({
+        title: "Friend request sent",
+        description: "Your friend request has been delivered.",
+      })
+    } catch (error) {
+      console.error("Failed to send friend request:", error)
+      toast({
+        title: "Request failed",
+        description: "We couldn't send that friend request. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleJoinCommunity = (communityId: string) => {
-    setCommunities((prev) =>
-      prev.map((community) =>
-        community.id === communityId ? { ...community, memberCount: community.memberCount + 1 } : community,
-      ),
-    )
+  const handleJoinCommunity = async (communityId: string) => {
+    try {
+      const targetCommunity = communities.find((community) => community.id === communityId)
+      const numericId = targetCommunity?.numericId ?? Number(communityId)
+      if (typeof numericId === "number" && !Number.isNaN(numericId)) {
+        await socialAPI.joinGroup(numericId)
+      }
+
+      setCommunities((prev) =>
+        prev.map((community) =>
+          community.id === communityId
+            ? { ...community, memberCount: community.memberCount + 1 }
+            : community,
+        ),
+      )
+
+      toast({
+        title: "Joined community",
+        description: "You're now part of this community.",
+      })
+    } catch (error) {
+      console.error("Failed to join community:", error)
+      toast({
+        title: "Join failed",
+        description: "Unable to join that community right now.",
+        variant: "destructive",
+      })
+    }
   }
 
   const getRarityColor = (rarity: string) => {
@@ -428,21 +467,58 @@ export function EnhancedSocialFeatures() {
     }
   }
 
-  const filteredUsers = users.filter(
-    (user) =>
-      searchQuery === "" ||
-      user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.displayName.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  const communityCategories = useMemo(() => {
+    const categories = new Set<string>()
+    communities.forEach((community) => {
+      if (community.category) {
+        categories.add(community.category.toLowerCase())
+      }
+    })
+    return Array.from(categories)
+  }, [communities])
 
-  const filteredCommunities = communities.filter((community) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      community.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      community.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === "all" || community.category.toLowerCase() === selectedCategory
-    return matchesSearch && matchesCategory
-  })
+  useEffect(() => {
+    if (selectedCategory !== "all" && !communityCategories.includes(selectedCategory)) {
+      setSelectedCategory("all")
+    }
+  }, [communityCategories, selectedCategory])
+
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return users
+    }
+
+    const query = searchQuery.toLowerCase()
+    return users.filter(
+      (user) =>
+        user.username.toLowerCase().includes(query) ||
+        user.displayName.toLowerCase().includes(query),
+    )
+  }, [searchQuery, users])
+
+  const filteredCommunities = useMemo(() => {
+    const query = searchQuery.toLowerCase()
+    return communities.filter((community) => {
+      const matchesSearch =
+        !searchQuery.trim() ||
+        community.name.toLowerCase().includes(query) ||
+        community.description.toLowerCase().includes(query)
+
+      const matchesCategory =
+        selectedCategory === "all" || community.category.toLowerCase() === selectedCategory
+
+      return matchesSearch && matchesCategory
+    })
+  }, [communities, searchQuery, selectedCategory])
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-16">
+        <LoadingSpinner size="lg" />
+        <p className="text-sm text-muted-foreground">Loading your social hub…</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -618,9 +694,22 @@ export function EnhancedSocialFeatures() {
                         </div>
                       </div>
 
-                      <Button className="w-full" onClick={() => handleFollowUser(user.id)}>
+                      <Button
+                        className="w-full"
+                        onClick={() => handleFollowUser(user.id)}
+                        disabled={user.friendshipStatus === "friends" || user.friendshipStatus === "pending_sent"}
+                        variant={
+                          user.friendshipStatus === "friends" || user.friendshipStatus === "pending_sent"
+                            ? "outline"
+                            : "default"
+                        }
+                      >
                         <UserPlus className="mr-2 h-4 w-4" />
-                        Add Friend
+                        {user.friendshipStatus === "friends"
+                          ? "Friends"
+                          : user.friendshipStatus === "pending_sent"
+                            ? "Request Sent"
+                            : "Add Friend"}
                       </Button>
                     </CardContent>
                   </Card>
@@ -646,10 +735,11 @@ export function EnhancedSocialFeatures() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
-                      <SelectItem value="genre">Genre</SelectItem>
-                      <SelectItem value="language">Language</SelectItem>
-                      <SelectItem value="region">Region</SelectItem>
-                      <SelectItem value="hobby">Hobby</SelectItem>
+                      {communityCategories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <div className="relative">

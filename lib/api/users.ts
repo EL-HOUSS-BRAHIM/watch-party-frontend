@@ -233,7 +233,12 @@ export class UsersAPI {
   /**
    * Get user activity
    */
-  async getActivity(params?: { page?: number }): Promise<PaginatedResponse<any>> {
+  async getActivity(params?: {
+    page?: number
+    type?: string
+    timeframe?: string
+    visibility?: "public" | "friends_only" | "private"
+  }): Promise<PaginatedResponse<any>> {
     return apiClient.get<PaginatedResponse<any>>(API_ENDPOINTS.users.activity, { params })
   }
 
@@ -335,11 +340,18 @@ export class UsersAPI {
   /**
    * Search users
    */
-  async searchUsers(params: { 
+  async searchUsers(params: {
     q: string
     limit?: number
-  }): Promise<PaginatedResponse<Friend>> {
-    return apiClient.get<PaginatedResponse<Friend>>(API_ENDPOINTS.users.search, { params })
+    sort?: string
+    location?: string
+    has_avatar?: boolean
+    is_online?: boolean
+    verified?: boolean
+    min_mutual_friends?: number
+    genres?: string[]
+  }): Promise<PaginatedResponse<any>> {
+    return apiClient.get(API_ENDPOINTS.users.search, { params })
   }
 
   /**

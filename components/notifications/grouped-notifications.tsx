@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,26 +18,18 @@ import {
   Check,
   CheckCheck,
   Trash2,
-  MoreHorizontal
+  MoreHorizontal,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { notificationsAPI, partiesAPI, usersAPI } from '@/lib/api';
+import type { Notification as APINotification } from '@/lib/api';
 
-interface Notification {
-  id: string;
-  type: 'friend_request' | 'like' | 'comment' | 'party_invite' | 'achievement' | 'system';
-  title: string;
-  message: string;
-  avatar?: string;
-  timestamp: string;
-  read: boolean;
-  actionable?: boolean;
-  data?: {
-    userId?: string;
-    videoId?: string;
-    partyId?: string;
-    achievementId?: string;
-  };
-}
+type NotificationWithMeta = APINotification & {
+  avatar?: string | null;
+  actionable: boolean;
+  metadata?: Record<string, any>;
+};
 
 interface NotificationGroup {
   id: string;
@@ -45,9 +37,57 @@ interface NotificationGroup {
   title: string;
   count: number;
   latestTimestamp: string;
-  notifications: Notification[];
+  notifications: NotificationWithMeta[];
   collapsed: boolean;
 }
+
+interface PaginationState {
+  currentPage: number;
+  next: string | null;
+  count: number;
+}
+
+const FALLBACK_AVATAR = '/placeholder-user.jpg';
+
+const getGroupTitle = (type: string): string => {
+  switch (type) {
+    case 'friend_request':
+      return 'Friend Requests';
+    case 'like':
+      return 'Likes';
+    case 'comment':
+      return 'Comments';
+    case 'party_invite':
+      return 'Party Invitations';
+    case 'achievement':
+      return 'Achievements';
+    case 'video_upload':
+      return 'Video Updates';
+    default:
+      return 'Notifications';
+  }
+};
+
+const enhanceNotification = (notification: APINotification): NotificationWithMeta => {
+  const metadata = notification.action_data ?? {};
+  const userData = metadata.user ?? metadata.sender ?? metadata.requester ?? {};
+  const avatar =
+    metadata.avatar ??
+    metadata.user_avatar ??
+    userData.avatar ??
+    userData.avatar_url ??
+    userData.image ??
+    FALLBACK_AVATAR;
+
+  const actionableTypes = new Set(['friend_request', 'party_invite']);
+
+  return {
+    ...notification,
+    avatar,
+    actionable: actionableTypes.has(notification.type),
+    metadata,
+  };
+};
 
 const NotificationIcon = ({ type }: { type: string }) => {
   switch (type) {
@@ -61,271 +101,320 @@ const NotificationIcon = ({ type }: { type: string }) => {
       return <Video className="h-4 w-4 text-purple-500" />;
     case 'achievement':
       return <Star className="h-4 w-4 text-yellow-500" />;
+    case 'video_upload':
+      return <Video className="h-4 w-4 text-indigo-500" />;
     default:
       return <Bell className="h-4 w-4 text-gray-500" />;
   }
 };
 
 export default function GroupedNotifications() {
-  const [notificationGroups, setNotificationGroups] = useState<NotificationGroup[]>([]);
+  const { toast } = useToast();
+  const [notifications, setNotifications] = useState<NotificationWithMeta[]>([]);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unread' | 'actionable'>('all');
+  const [pagination, setPagination] = useState<PaginationState>({ currentPage: 1, next: null, count: 0 });
+
+  const fetchNotifications = useCallback(
+    async (page = 1, append = false) => {
+      setLoading(true);
+      try {
+        const response = await notificationsAPI.getNotifications({
+          page,
+          unread: filter === 'unread' ? true : undefined,
+        });
+
+        const items = Array.isArray(response?.results) ? response.results : [];
+        const enhanced = items.map(enhanceNotification);
+
+        setNotifications((prev) => (append ? [...prev, ...enhanced] : enhanced));
+        setPagination({
+          currentPage: page,
+          next: response?.next ?? null,
+          count: response?.count ?? enhanced.length,
+        });
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+        toast({
+          title: 'Unable to load notifications',
+          description: 'Please try again later.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filter, toast],
+  );
 
   useEffect(() => {
-    fetchNotifications();
-  }, []);
+    void fetchNotifications(1, false);
+  }, [fetchNotifications]);
 
-  const fetchNotifications = async () => {
-    setLoading(true);
-    try {
-      // Mock data - replace with actual API call
-      const mockNotifications: Notification[] = [
-        // Friend requests
-        {
-          id: '1',
-          type: 'friend_request',
-          title: 'New friend request',
-          message: 'Alex Chen wants to be your friend',
-          avatar: '/placeholder-user.jpg',
-          timestamp: '2024-01-15T10:30:00Z',
-          read: false,
-          actionable: true,
-          data: { userId: 'user1' },
-        },
-        {
-          id: '2',
-          type: 'friend_request',
-          title: 'New friend request',
-          message: 'Sarah Johnson wants to be your friend',
-          avatar: '/placeholder-user.jpg',
-          timestamp: '2024-01-15T09:15:00Z',
-          read: false,
-          actionable: true,
-          data: { userId: 'user2' },
-        },
-        
-        // Likes
-        {
-          id: '3',
-          type: 'like',
-          title: 'Video liked',
-          message: 'Mike Rodriguez liked your video "Movie Review: Dune"',
-          avatar: '/placeholder-user.jpg',
-          timestamp: '2024-01-15T08:45:00Z',
-          read: true,
-          data: { userId: 'user3', videoId: 'video1' },
-        },
-        {
-          id: '4',
-          type: 'like',
-          title: 'Video liked',
-          message: 'Emma Watson liked your video "Top 10 Sci-Fi Movies"',
-          avatar: '/placeholder-user.jpg',
-          timestamp: '2024-01-15T08:30:00Z',
-          read: true,
-          data: { userId: 'user4', videoId: 'video2' },
-        },
-        {
-          id: '5',
-          type: 'like',
-          title: 'Video liked',
-          message: '3 others liked your video "Movie Review: Dune"',
-          timestamp: '2024-01-15T08:00:00Z',
-          read: true,
-          data: { videoId: 'video1' },
-        },
-
-        // Comments
-        {
-          id: '6',
-          type: 'comment',
-          title: 'New comment',
-          message: 'Lisa Park commented on your video: "Great analysis of the cinematography!"',
-          avatar: '/placeholder-user.jpg',
-          timestamp: '2024-01-15T07:30:00Z',
-          read: false,
-          data: { userId: 'user5', videoId: 'video1' },
-        },
-
-        // Party invites
-        {
-          id: '7',
-          type: 'party_invite',
-          title: 'Party invitation',
-          message: 'David Kim invited you to "Horror Movie Marathon"',
-          avatar: '/placeholder-user.jpg',
-          timestamp: '2024-01-15T06:00:00Z',
-          read: false,
-          actionable: true,
-          data: { userId: 'user6', partyId: 'party1' },
-        },
-
-        // Achievements
-        {
-          id: '8',
-          type: 'achievement',
-          title: 'Achievement unlocked!',
-          message: 'You earned the "Movie Buff" badge for watching 100 movies!',
-          timestamp: '2024-01-14T20:00:00Z',
-          read: false,
-          data: { achievementId: 'movie_buff' },
-        },
-      ];
-
-      // Group notifications by type
-      const groups = groupNotifications(mockNotifications);
-      setNotificationGroups(groups);
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error);
-    } finally {
-      setLoading(false);
+  const filteredNotifications = useMemo(() => {
+    if (filter === 'unread') {
+      return notifications.filter((notification) => !notification.is_read);
     }
-  };
 
-  const groupNotifications = (notifications: Notification[]): NotificationGroup[] => {
-    const groupedMap = new Map<string, NotificationGroup>();
+    if (filter === 'actionable') {
+      return notifications.filter((notification) => notification.actionable);
+    }
 
-    notifications.forEach(notification => {
-      const groupKey = notification.type;
-      
-      if (!groupedMap.has(groupKey)) {
-        groupedMap.set(groupKey, {
+    return notifications;
+  }, [notifications, filter]);
+
+  const groupedNotifications = useMemo(() => {
+    const groups = new Map<string, NotificationGroup>();
+
+    filteredNotifications.forEach((notification) => {
+      const groupKey = notification.type ?? 'system';
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
           id: groupKey,
-          type: notification.type,
-          title: getGroupTitle(notification.type),
+          type: groupKey,
+          title: getGroupTitle(groupKey),
           count: 0,
-          latestTimestamp: notification.timestamp,
+          latestTimestamp: notification.created_at,
           notifications: [],
-          collapsed: false,
+          collapsed: Boolean(collapsedGroups[groupKey]),
         });
       }
 
-      const group = groupedMap.get(groupKey)!;
+      const group = groups.get(groupKey)!;
       group.notifications.push(notification);
-      group.count++;
-      
-      // Update latest timestamp if this notification is newer
-      if (new Date(notification.timestamp) > new Date(group.latestTimestamp)) {
-        group.latestTimestamp = notification.timestamp;
+      group.count += 1;
+
+      if (new Date(notification.created_at).getTime() > new Date(group.latestTimestamp).getTime()) {
+        group.latestTimestamp = notification.created_at;
       }
     });
 
-    // Convert to array and sort by latest timestamp
-    return Array.from(groupedMap.values())
-      .sort((a, b) => new Date(b.latestTimestamp).getTime() - new Date(a.latestTimestamp).getTime());
-  };
-
-  const getGroupTitle = (type: string): string => {
-    switch (type) {
-      case 'friend_request':
-        return 'Friend Requests';
-      case 'like':
-        return 'Likes';
-      case 'comment':
-        return 'Comments';
-      case 'party_invite':
-        return 'Party Invitations';
-      case 'achievement':
-        return 'Achievements';
-      case 'system':
-        return 'System Notifications';
-      default:
-        return 'Notifications';
-    }
-  };
-
-  const toggleGroup = (groupId: string) => {
-    setNotificationGroups(groups =>
-      groups.map(group =>
-        group.id === groupId ? { ...group, collapsed: !group.collapsed } : group
-      )
+    return Array.from(groups.values()).sort(
+      (a, b) => new Date(b.latestTimestamp).getTime() - new Date(a.latestTimestamp).getTime(),
     );
-  };
+  }, [filteredNotifications, collapsedGroups]);
 
-  const markAsRead = (notificationId: string) => {
-    setNotificationGroups(groups =>
-      groups.map(group => ({
-        ...group,
-        notifications: group.notifications.map(notification =>
-          notification.id === notificationId
-            ? { ...notification, read: true }
-            : notification
-        ),
-      }))
-    );
-  };
-
-  const markGroupAsRead = (groupId: string) => {
-    setNotificationGroups(groups =>
-      groups.map(group =>
-        group.id === groupId
-          ? {
-              ...group,
-              notifications: group.notifications.map(notification => ({
-                ...notification,
-                read: true,
-              })),
-            }
-          : group
-      )
-    );
-  };
-
-  const deleteNotification = (notificationId: string) => {
-    setNotificationGroups(groups =>
-      groups.map(group => ({
-        ...group,
-        notifications: group.notifications.filter(n => n.id !== notificationId),
-        count: group.notifications.filter(n => n.id !== notificationId).length,
-      })).filter(group => group.count > 0)
-    );
-  };
-
-  const handleFriendRequest = async (notificationId: string, action: 'accept' | 'decline') => {
-    try {
-      // Handle friend request action
-      console.log(`${action} friend request:`, notificationId);
-      
-      // Remove notification after action
-      deleteNotification(notificationId);
-    } catch (error) {
-      console.error('Failed to handle friend request:', error);
-    }
-  };
-
-  const handlePartyInvite = async (notificationId: string, action: 'accept' | 'decline') => {
-    try {
-      // Handle party invite action
-      console.log(`${action} party invite:`, notificationId);
-      
-      // Remove notification after action
-      deleteNotification(notificationId);
-    } catch (error) {
-      console.error('Failed to handle party invite:', error);
-    }
-  };
-
-  const filteredGroups = notificationGroups.filter(group => {
-    if (filter === 'unread') {
-      return group.notifications.some(n => !n.read);
-    }
-    if (filter === 'actionable') {
-      return group.notifications.some(n => n.actionable);
-    }
-    return true;
-  });
-
-  const unreadCount = notificationGroups.reduce(
-    (total, group) => total + group.notifications.filter(n => !n.read).length,
-    0
+  const unreadCount = useMemo(
+    () => notifications.reduce((total, notification) => total + (notification.is_read ? 0 : 1), 0),
+    [notifications],
   );
 
-  const actionableCount = notificationGroups.reduce(
-    (total, group) => total + group.notifications.filter(n => n.actionable).length,
-    0
+  const actionableCount = useMemo(
+    () => notifications.reduce((total, notification) => total + (notification.actionable ? 1 : 0), 0),
+    [notifications],
   );
 
-  if (loading) {
+  const totalCount = pagination.count ?? notifications.length;
+
+  const toggleGroup = useCallback((groupId: string) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  }, []);
+
+  const handleMarkAsRead = useCallback(
+    async (notificationId: string) => {
+      try {
+        await notificationsAPI.markAsRead(notificationId);
+        setNotifications((prev) =>
+          prev.map((notification) =>
+            notification.id === notificationId ? { ...notification, is_read: true } : notification,
+          ),
+        );
+      } catch (error) {
+        console.error('Failed to mark notification as read:', error);
+        toast({
+          title: 'Unable to update notification',
+          description: 'Please try again later.',
+          variant: 'destructive',
+        });
+      }
+    },
+    [toast],
+  );
+
+  const handleMarkGroupAsRead = useCallback(
+    async (groupId: string) => {
+      const groupNotifications = notifications.filter(
+        (notification) => notification.type === groupId && !notification.is_read,
+      );
+
+      if (groupNotifications.length === 0) {
+        return;
+      }
+
+      try {
+        await Promise.all(groupNotifications.map((notification) => notificationsAPI.markAsRead(notification.id)));
+        setNotifications((prev) =>
+          prev.map((notification) =>
+            notification.type === groupId ? { ...notification, is_read: true } : notification,
+          ),
+        );
+      } catch (error) {
+        console.error('Failed to mark notifications as read:', error);
+        toast({
+          title: 'Unable to update notifications',
+          description: 'Please try again later.',
+          variant: 'destructive',
+        });
+      }
+    },
+    [notifications, toast],
+  );
+
+  const handleMarkAllRead = useCallback(async () => {
+    if (notifications.length === 0 || unreadCount === 0) {
+      return;
+    }
+
+    try {
+      await notificationsAPI.markAllAsRead();
+      setNotifications((prev) => prev.map((notification) => ({ ...notification, is_read: true })));
+      toast({
+        title: 'All notifications marked as read',
+        description: 'You are all caught up.',
+      });
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+      toast({
+        title: 'Unable to update notifications',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
+    }
+  }, [notifications.length, unreadCount, toast]);
+
+  const handleDeleteNotification = useCallback(
+    async (notificationId: string) => {
+      try {
+        await notificationsAPI.deleteNotification(notificationId);
+        setNotifications((prev) => prev.filter((notification) => notification.id !== notificationId));
+        setPagination((prev) => ({
+          ...prev,
+          count: Math.max(0, prev.count - 1),
+        }));
+      } catch (error) {
+        console.error('Failed to delete notification:', error);
+        toast({
+          title: 'Unable to delete notification',
+          description: 'Please try again later.',
+          variant: 'destructive',
+        });
+      }
+    },
+    [toast],
+  );
+
+  const handleClearAll = useCallback(async () => {
+    if (notifications.length === 0) {
+      return;
+    }
+
+    try {
+      await notificationsAPI.clearAll();
+      setNotifications([]);
+      setPagination({ currentPage: 1, next: null, count: 0 });
+      toast({
+        title: 'Notifications cleared',
+        description: 'All notifications have been removed.',
+      });
+    } catch (error) {
+      console.error('Failed to clear notifications:', error);
+      toast({
+        title: 'Unable to clear notifications',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
+    }
+  }, [notifications.length, toast]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!pagination.next) {
+      return;
+    }
+
+    void fetchNotifications(pagination.currentPage + 1, true);
+  }, [fetchNotifications, pagination]);
+
+  const handleFriendRequest = useCallback(
+    async (notification: NotificationWithMeta, action: 'accept' | 'decline') => {
+      try {
+        const metadata = notification.metadata ?? {};
+        const requestId =
+          metadata.request_id ?? metadata.id ?? metadata.friend_request_id ?? metadata.user_id;
+
+        if (requestId) {
+          if (action === 'accept') {
+            await usersAPI.acceptFriendRequest(String(requestId));
+          } else {
+            await usersAPI.declineFriendRequest(String(requestId));
+          }
+        }
+
+        await notificationsAPI.markAsRead(notification.id);
+        setNotifications((prev) => prev.filter((item) => item.id !== notification.id));
+
+        toast({
+          title: action === 'accept' ? 'Friend request accepted' : 'Friend request declined',
+          description:
+            action === 'accept'
+              ? 'You are now connected.'
+              : 'The request has been declined.',
+        });
+      } catch (error) {
+        console.error('Failed to handle friend request:', error);
+        toast({
+          title: 'Unable to update friend request',
+          description: 'Please try again later.',
+          variant: 'destructive',
+        });
+      }
+    },
+    [toast],
+  );
+
+  const handlePartyInvite = useCallback(
+    async (notification: NotificationWithMeta, action: 'accept' | 'decline') => {
+      try {
+        const metadata = notification.metadata ?? {};
+
+        if (action === 'accept') {
+          const inviteCode = metadata.invite_code ?? metadata.code;
+          const partyId = metadata.party_id ?? metadata.id;
+
+          if (inviteCode) {
+            await partiesAPI.joinByInvite({ invite_code: String(inviteCode) });
+          } else if (partyId) {
+            await partiesAPI.joinParty(String(partyId));
+          }
+        }
+
+        await notificationsAPI.markAsRead(notification.id);
+        setNotifications((prev) => prev.filter((item) => item.id !== notification.id));
+
+        toast({
+          title: action === 'accept' ? 'Party invite accepted' : 'Party invite dismissed',
+          description:
+            action === 'accept'
+              ? 'You have joined the watch party.'
+              : 'The invitation has been dismissed.',
+        });
+      } catch (error) {
+        console.error('Failed to handle party invite:', error);
+        toast({
+          title: 'Unable to update party invite',
+          description: 'Please try again later.',
+          variant: 'destructive',
+        });
+      }
+    },
+    [toast],
+  );
+
+  if (loading && notifications.length === 0) {
     return (
       <div className="space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
@@ -351,15 +440,25 @@ export default function GroupedNotifications() {
         <div>
           <h1 className="text-2xl font-bold">Notifications</h1>
           <p className="text-muted-foreground">
-            {unreadCount > 0 ? `${unreadCount} unread notifications` : 'You\'re all caught up!'}
+            {unreadCount > 0 ? `${unreadCount} unread notifications` : "You're all caught up!"}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={notifications.length === 0 || unreadCount === 0}
+            onClick={handleMarkAllRead}
+          >
             <CheckCheck className="h-4 w-4 mr-1" />
             Mark All Read
           </Button>
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={notifications.length === 0}
+            onClick={handleClearAll}
+          >
             <Trash2 className="h-4 w-4 mr-1" />
             Clear All
           </Button>
@@ -368,37 +467,30 @@ export default function GroupedNotifications() {
 
       <Tabs value={filter} onValueChange={(value) => setFilter(value as typeof filter)}>
         <TabsList>
-          <TabsTrigger value="all">
-            All ({notificationGroups.reduce((total, group) => total + group.count, 0)})
-          </TabsTrigger>
-          <TabsTrigger value="unread">
-            Unread ({unreadCount})
-          </TabsTrigger>
-          <TabsTrigger value="actionable">
-            Action Required ({actionableCount})
-          </TabsTrigger>
+          <TabsTrigger value="all">All ({totalCount})</TabsTrigger>
+          <TabsTrigger value="unread">Unread ({unreadCount})</TabsTrigger>
+          <TabsTrigger value="actionable">Action Required ({actionableCount})</TabsTrigger>
         </TabsList>
 
         <TabsContent value={filter} className="space-y-4 mt-6">
-          {filteredGroups.length === 0 ? (
+          {groupedNotifications.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
                 <Bell className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">No notifications</h3>
                 <p className="text-muted-foreground">
-                  {filter === 'unread' 
-                    ? "You're all caught up!" 
+                  {filter === 'unread'
+                    ? "You're all caught up!"
                     : filter === 'actionable'
-                    ? "No actions required"
-                    : "You don't have any notifications yet"
-                  }
+                    ? 'No actions required'
+                    : "You don't have any notifications yet"}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            filteredGroups.map((group) => (
+            groupedNotifications.map((group) => (
               <Card key={group.id}>
-                <CardHeader 
+                <CardHeader
                   className="cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => toggleGroup(group.id)}
                 >
@@ -408,14 +500,14 @@ export default function GroupedNotifications() {
                       <div>
                         <CardTitle className="text-lg">{group.title}</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                          {group.count} notification{group.count !== 1 ? 's' : ''} • {' '}
+                          {group.count} notification{group.count !== 1 ? 's' : ''} •{' '}
                           {formatDistanceToNow(new Date(group.latestTimestamp), { addSuffix: true })}
                         </p>
                       </div>
                       <Badge variant="secondary">{group.count}</Badge>
-                      {group.notifications.some(n => !n.read) && (
+                      {group.notifications.some((notification) => !notification.is_read) && (
                         <Badge variant="destructive">
-                          {group.notifications.filter(n => !n.read).length}
+                          {group.notifications.filter((notification) => !notification.is_read).length}
                         </Badge>
                       )}
                     </div>
@@ -423,9 +515,9 @@ export default function GroupedNotifications() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          markGroupAsRead(group.id);
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleMarkGroupAsRead(group.id);
                         }}
                       >
                         <Check className="h-4 w-4" />
@@ -446,7 +538,7 @@ export default function GroupedNotifications() {
                         <div
                           key={notification.id}
                           className={`flex items-start gap-4 p-4 rounded-lg border transition-colors ${
-                            !notification.read ? 'bg-blue-50 border-blue-200' : 'bg-background'
+                            !notification.is_read ? 'bg-blue-50 border-blue-200' : 'bg-background'
                           }`}
                         >
                           {notification.avatar && (
@@ -466,15 +558,15 @@ export default function GroupedNotifications() {
                                   {notification.message}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-2">
-                                  {formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true })}
+                                  {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                                 </p>
                               </div>
                               <div className="flex items-center gap-1">
-                                {!notification.read && (
+                                {!notification.is_read && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => markAsRead(notification.id)}
+                                    onClick={() => void handleMarkAsRead(notification.id)}
                                   >
                                     <Check className="h-4 w-4" />
                                   </Button>
@@ -482,7 +574,7 @@ export default function GroupedNotifications() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => deleteNotification(notification.id)}
+                                  onClick={() => void handleDeleteNotification(notification.id)}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -495,14 +587,14 @@ export default function GroupedNotifications() {
                                   <>
                                     <Button
                                       size="sm"
-                                      onClick={() => handleFriendRequest(notification.id, 'accept')}
+                                      onClick={() => void handleFriendRequest(notification, 'accept')}
                                     >
                                       Accept
                                     </Button>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => handleFriendRequest(notification.id, 'decline')}
+                                      onClick={() => void handleFriendRequest(notification, 'decline')}
                                     >
                                       Decline
                                     </Button>
@@ -512,14 +604,14 @@ export default function GroupedNotifications() {
                                   <>
                                     <Button
                                       size="sm"
-                                      onClick={() => handlePartyInvite(notification.id, 'accept')}
+                                      onClick={() => void handlePartyInvite(notification, 'accept')}
                                     >
                                       Join Party
                                     </Button>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => handlePartyInvite(notification.id, 'decline')}
+                                      onClick={() => void handlePartyInvite(notification, 'decline')}
                                     >
                                       Decline
                                     </Button>
@@ -535,6 +627,13 @@ export default function GroupedNotifications() {
                 )}
               </Card>
             ))
+          )}
+          {pagination.next && groupedNotifications.length > 0 && (
+            <div className="flex justify-center pt-2">
+              <Button variant="outline" onClick={handleLoadMore} disabled={loading}>
+                Load More
+              </Button>
+            </div>
           )}
         </TabsContent>
       </Tabs>

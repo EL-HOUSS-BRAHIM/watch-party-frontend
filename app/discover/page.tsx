@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
+import { analyticsAPI, partiesAPI, searchAPI, usersAPI, videosAPI } from "@/lib/api"
+import type { DiscoverContent, DiscoverRecommendation } from "@/lib/api"
 import {
   Compass,
   TrendingUp,
@@ -34,56 +35,62 @@ import {
   Zap,
   Crown,
   MapPin,
-  ArrowRight,
   Sparkles,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
-interface TrendingVideo {
+type SuggestionReason =
+  | "mutual_friends"
+  | "common_interests"
+  | "popular"
+  | "new_user"
+  | "recent_activity"
+  | "similar_content"
+
+interface TrendingVideoCard {
   id: string
   title: string
-  description: string
-  thumbnail: string
-  duration: number
+  description?: string
+  thumbnail?: string | null
+  durationLabel: string
   views: number
   likes: number
   createdAt: string
-  author: {
+  uploader: {
     id: string
-    username: string
-    avatar?: string
+    name: string
+    avatar?: string | null
     isVerified: boolean
   }
   tags: string[]
-  trendingScore: number
+  trendingScore?: number
 }
 
-interface FeaturedParty {
+interface FeaturedPartyCard {
   id: string
-  name: string
-  description: string
-  thumbnail?: string
+  title: string
+  description?: string
+  thumbnail?: string | null
   host: {
     id: string
-    username: string
-    avatar?: string
+    name: string
+    avatar?: string | null
     isVerified: boolean
   }
-  scheduledFor?: string
+  scheduledFor?: string | null
   isActive: boolean
   participantCount: number
-  maxParticipants?: number
+  maxParticipants?: number | null
   tags: string[]
-  category: string
-  isFeatured: boolean
+  highlight?: "trending" | "recommended"
 }
 
-interface SuggestedUser {
+interface SuggestedUserCard {
   id: string
   username: string
   firstName: string
   lastName: string
-  avatar?: string
+  avatar?: string | null
   bio?: string
   location?: string
   isOnline: boolean
@@ -95,211 +102,573 @@ interface SuggestedUser {
     partiesHosted: number
     friendsCount: number
   }
-  reasonForSuggestion: "mutual_friends" | "common_interests" | "popular" | "new_user"
+  reasonForSuggestion: SuggestionReason
 }
 
-interface TrendingCategory {
+interface DiscoverCategoryCard {
   id: string
   name: string
-  description: string
+  description?: string
   icon: string
-  videoCount: number
+  itemCount: number
   isGrowing: boolean
-  color: string
+  colorClass: string
+}
+
+const FALLBACK_AVATAR = "/placeholder-user.jpg"
+const FALLBACK_THUMBNAIL = "/placeholder.svg?height=200&width=350"
+
+const CATEGORY_GRADIENTS = [
+  "from-purple-500 to-blue-500",
+  "from-pink-500 to-orange-500",
+  "from-green-500 to-emerald-500",
+  "from-indigo-500 to-purple-500",
+  "from-rose-500 to-red-500",
+  "from-sky-500 to-cyan-500",
+  "from-amber-500 to-orange-500",
+  "from-lime-500 to-green-500",
+]
+
+const CATEGORY_ICONS = ["🎬", "🎮", "🎵", "📺", "📚", "⚽", "😂", "🌐"]
+
+const safeNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value)
+    if (!Number.isNaN(parsed)) {
+      return parsed
+    }
+  }
+
+  return fallback
+}
+
+const fallbackId = (prefix: string) =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? `${prefix}-${crypto.randomUUID()}`
+    : `${prefix}-${Math.random().toString(36).slice(2, 11)}`
+
+const formatVideoDurationLabel = (duration: unknown): string => {
+  if (duration === null || typeof duration === "undefined") {
+    return "Live"
+  }
+
+  if (typeof duration === "number" && Number.isFinite(duration)) {
+    const totalSeconds = Math.max(duration, 0)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = Math.floor(totalSeconds % 60)
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`
+    }
+
+    if (minutes > 0) {
+      return `${minutes}m`
+    }
+
+    return `${seconds}s`
+  }
+
+  if (typeof duration === "string") {
+    if (duration.includes(":")) {
+      const parts = duration.split(":").map((part) => Number(part))
+      if (parts.every((part) => Number.isFinite(part))) {
+        const [hours = 0, minutes = 0, seconds = 0] = parts
+        if (hours > 0) {
+          return `${hours}h ${minutes}m`
+        }
+        if (minutes > 0) {
+          return `${minutes}m`
+        }
+        return `${seconds}s`
+      }
+    }
+
+    const parsed = Number(duration)
+    if (!Number.isNaN(parsed)) {
+      return formatVideoDurationLabel(parsed)
+    }
+
+    return duration
+  }
+
+  return "Live"
+}
+
+const extractTags = (entity: any): string[] => {
+  if (!entity) {
+    return []
+  }
+
+  if (Array.isArray(entity.tags)) {
+    return entity.tags.map((tag: any) => String(tag))
+  }
+
+  if (Array.isArray(entity.categories)) {
+    return entity.categories.map((tag: any) => String(tag))
+  }
+
+  if (Array.isArray(entity.genres)) {
+    return entity.genres.map((tag: any) => String(tag))
+  }
+
+  if (Array.isArray(entity.topics)) {
+    return entity.topics.map((tag: any) => String(tag))
+  }
+
+  if (Array.isArray(entity.metadata?.tags)) {
+    return entity.metadata.tags.map((tag: any) => String(tag))
+  }
+
+  return []
+}
+
+const resolvePartyActive = (party: any): boolean => {
+  if (typeof party?.is_active === "boolean") {
+    return party.is_active
+  }
+
+  if (typeof party?.isActive === "boolean") {
+    return party.isActive
+  }
+
+  const status = typeof party?.status === "string" ? party.status.toLowerCase() : ""
+  return ["live", "active", "running"].includes(status)
+}
+
+const buildVideoCard = (video: any): TrendingVideoCard => {
+  const id = video?.id ?? video?.video_id ?? fallbackId("video")
+  const uploader = video?.uploader ?? video?.author ?? video?.creator ?? {}
+  const tags = extractTags(video)
+  const trendingScore = safeNumber(video?.trending_score ?? video?.score ?? Number.NaN, Number.NaN)
+
+  return {
+    id: String(id),
+    title: video?.title ?? video?.name ?? "Untitled video",
+    description: video?.description ?? video?.summary ?? undefined,
+    thumbnail:
+      video?.thumbnail ??
+      video?.poster ??
+      video?.preview_image ??
+      video?.image ??
+      video?.media?.thumbnail ??
+      FALLBACK_THUMBNAIL,
+    durationLabel: formatVideoDurationLabel(video?.duration ?? video?.runtime ?? video?.length),
+    views: safeNumber(video?.view_count ?? video?.views ?? video?.metrics?.views, 0),
+    likes: safeNumber(video?.like_count ?? video?.likes ?? video?.metrics?.likes, 0),
+    createdAt: video?.created_at ?? video?.published_at ?? new Date().toISOString(),
+    uploader: {
+      id: String(uploader?.id ?? uploader?.user_id ?? uploader?.username ?? fallbackId("user")),
+      name:
+        uploader?.name ??
+        uploader?.full_name ??
+        uploader?.username ??
+        uploader?.display_name ??
+        "Creator",
+      avatar:
+        uploader?.avatar ??
+        uploader?.avatar_url ??
+        uploader?.image ??
+        uploader?.profile_image ??
+        uploader?.photo ??
+        FALLBACK_AVATAR,
+      isVerified: Boolean(uploader?.is_verified ?? uploader?.is_premium ?? uploader?.verified ?? uploader?.isVerified),
+    },
+    tags,
+    trendingScore: Number.isFinite(trendingScore) ? trendingScore : undefined,
+  }
+}
+
+const buildPartyCard = (party: any, highlight?: "trending" | "recommended"): FeaturedPartyCard => {
+  const host = party?.host ?? party?.owner ?? party?.organizer ?? {}
+  const id = party?.id ?? party?.room_code ?? fallbackId("party")
+
+  return {
+    id: String(id),
+    title: party?.title ?? party?.name ?? "Watch Party",
+    description: party?.description ?? party?.summary ?? undefined,
+    thumbnail:
+      party?.thumbnail ??
+      party?.image ??
+      party?.cover_image ??
+      party?.video?.thumbnail ??
+      FALLBACK_THUMBNAIL,
+    host: {
+      id: String(host?.id ?? host?.user_id ?? host?.username ?? fallbackId("host")),
+      name:
+        host?.name ??
+        host?.full_name ??
+        host?.username ??
+        host?.display_name ??
+        "Host",
+      avatar:
+        host?.avatar ??
+        host?.avatar_url ??
+        host?.image ??
+        host?.profile_image ??
+        FALLBACK_AVATAR,
+      isVerified: Boolean(host?.is_verified ?? host?.is_premium ?? host?.verified),
+    },
+    scheduledFor: party?.scheduled_start ?? party?.starts_at ?? party?.scheduled_for ?? null,
+    isActive: resolvePartyActive(party),
+    participantCount: safeNumber(
+      party?.participant_count ?? party?.participants ?? party?.member_count ?? party?.attendance,
+      0,
+    ),
+    maxParticipants: party?.max_participants ?? party?.capacity ?? party?.max_attendees ?? null,
+    tags: extractTags(party),
+    highlight,
+  }
+}
+
+const dedupePartyCards = (parties: FeaturedPartyCard[]): FeaturedPartyCard[] => {
+  const byId = new Map<string, FeaturedPartyCard>()
+
+  for (const party of parties) {
+    const existing = byId.get(party.id)
+
+    if (!existing) {
+      byId.set(party.id, party)
+      continue
+    }
+
+    byId.set(party.id, {
+      ...existing,
+      ...party,
+      highlight: existing.highlight ?? party.highlight,
+      tags: existing.tags.length >= party.tags.length ? existing.tags : party.tags,
+      participantCount: Math.max(existing.participantCount, party.participantCount),
+      maxParticipants:
+        existing.maxParticipants && party.maxParticipants
+          ? Math.max(existing.maxParticipants, party.maxParticipants)
+          : existing.maxParticipants ?? party.maxParticipants ?? null,
+    })
+  }
+
+  return Array.from(byId.values())
+}
+
+const buildSuggestedUserCard = (
+  raw: any,
+  fallbackReason: SuggestionReason = "popular",
+): SuggestedUserCard => {
+  const username =
+    raw?.username ??
+    raw?.handle ??
+    raw?.user?.username ??
+    raw?.slug ??
+    String(raw?.id ?? fallbackId("user"))
+
+  const fullName =
+    raw?.full_name ??
+    raw?.name ??
+    raw?.display_name ??
+    raw?.user?.full_name ??
+    username
+
+  const nameParts = fullName.trim().split(/\s+/)
+  const firstName = nameParts[0] ?? username
+  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : firstName
+
+  const mutualFriends = safeNumber(
+    raw?.mutual_friends_count ?? raw?.mutual_friends ?? raw?.mutualFriends,
+    0,
+  )
+
+  const commonInterests = extractTags(raw)
+
+  let reason: SuggestionReason = fallbackReason
+  if (mutualFriends > 0) {
+    reason = "mutual_friends"
+  } else if (commonInterests.length > 0) {
+    reason = "common_interests"
+  } else if (raw?.is_new_user) {
+    reason = "new_user"
+  } else if (raw?.recent_activity) {
+    reason = "recent_activity"
+  } else if (raw?.similar_content) {
+    reason = "similar_content"
+  }
+
+  const stats = {
+    videosUploaded: safeNumber(
+      raw?.videos_uploaded ?? raw?.stats?.videos ?? raw?.video_count,
+      0,
+    ),
+    partiesHosted: safeNumber(
+      raw?.parties_hosted ?? raw?.stats?.parties ?? raw?.party_count,
+      0,
+    ),
+    friendsCount: safeNumber(
+      raw?.friends_count ?? raw?.stats?.friends ?? raw?.friend_count ?? mutualFriends,
+      0,
+    ),
+  }
+
+  const avatar =
+    raw?.avatar ??
+    raw?.avatar_url ??
+    raw?.profile_image ??
+    raw?.image ??
+    raw?.user?.avatar ??
+    FALLBACK_AVATAR
+
+  return {
+    id: String(raw?.id ?? username ?? fallbackId("user")),
+    username,
+    firstName,
+    lastName,
+    avatar,
+    bio: raw?.bio ?? raw?.about ?? raw?.description,
+    location: raw?.location ?? raw?.city ?? raw?.country ?? raw?.region,
+    isOnline: Boolean(raw?.is_online ?? raw?.online ?? raw?.status === "online"),
+    isVerified: Boolean(raw?.is_verified ?? raw?.isVerified ?? raw?.is_premium ?? raw?.verified),
+    mutualFriends,
+    commonInterests,
+    stats,
+    reasonForSuggestion: reason,
+  }
+}
+
+const dedupeSuggestions = (suggestions: SuggestedUserCard[]): SuggestedUserCard[] => {
+  const byId = new Map<string, SuggestedUserCard>()
+
+  suggestions.forEach((suggestion) => {
+    const existing = byId.get(suggestion.id)
+
+    if (!existing) {
+      byId.set(suggestion.id, suggestion)
+      return
+    }
+
+    byId.set(suggestion.id, {
+      ...existing,
+      ...suggestion,
+      commonInterests:
+        existing.commonInterests.length >= suggestion.commonInterests.length
+          ? existing.commonInterests
+          : suggestion.commonInterests,
+      stats: {
+        videosUploaded: Math.max(
+          existing.stats.videosUploaded,
+          suggestion.stats.videosUploaded,
+        ),
+        partiesHosted: Math.max(
+          existing.stats.partiesHosted,
+          suggestion.stats.partiesHosted,
+        ),
+        friendsCount: Math.max(
+          existing.stats.friendsCount,
+          suggestion.stats.friendsCount,
+        ),
+      },
+      reasonForSuggestion:
+        existing.reasonForSuggestion === "mutual_friends"
+          ? existing.reasonForSuggestion
+          : suggestion.reasonForSuggestion,
+    })
+  })
+
+  return Array.from(byId.values())
+}
+
+const buildCategoryCard = (category: any, index: number): DiscoverCategoryCard => {
+  const id = category?.id ?? category?.slug ?? category?.name ?? fallbackId("category")
+  const itemCount = safeNumber(
+    category?.content_count ?? category?.video_count ?? category?.count,
+    0,
+  )
+
+  const trendDirection =
+    typeof category?.trend_direction === "string"
+      ? category.trend_direction.toLowerCase()
+      : undefined
+
+  const isGrowing =
+    typeof category?.is_growing === "boolean"
+      ? category.is_growing
+      : trendDirection
+        ? trendDirection !== "down"
+        : itemCount > 0
+
+  return {
+    id: String(id),
+    name: category?.name ?? category?.title ?? "Category",
+    description: category?.description ?? category?.summary ?? undefined,
+    icon: String(category?.icon ?? CATEGORY_ICONS[index % CATEGORY_ICONS.length]),
+    itemCount,
+    isGrowing,
+    colorClass: CATEGORY_GRADIENTS[index % CATEGORY_GRADIENTS.length],
+  }
+}
+
+const formatStatValue = (value: number): string => {
+  if (!Number.isFinite(value)) {
+    return "0"
+  }
+
+  return Math.max(0, Math.round(value)).toLocaleString()
 }
 
 export default function DiscoverPage() {
   const router = useRouter()
-  const { user } = useAuth()
   const { toast } = useToast()
 
   const [activeTab, setActiveTab] = useState("trending")
   const [timeFilter, setTimeFilter] = useState("week")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const [trendingVideos, setTrendingVideos] = useState<TrendingVideo[]>([])
-  const [featuredParties, setFeaturedParties] = useState<FeaturedParty[]>([])
-  const [suggestedUsers, setSuggestedUsers] = useState<SuggestedUser[]>([])
-  const [trendingCategories, setTrendingCategories] = useState<TrendingCategory[]>([])
-
-  const [stats, setStats] = useState({
-    totalUsers: 125847,
-    activeParties: 342,
-    videosWatched: 2847291,
-    newUsersToday: 1247,
+  const [trendingVideos, setTrendingVideos] = useState<TrendingVideoCard[]>([])
+  const [featuredParties, setFeaturedParties] = useState<FeaturedPartyCard[]>([])
+  const [suggestedUsers, setSuggestedUsers] = useState<SuggestedUserCard[]>([])
+  const [trendingCategories, setTrendingCategories] = useState<DiscoverCategoryCard[]>([])
+  const [defaultCollections, setDefaultCollections] = useState({
+    videos: [] as TrendingVideoCard[],
+    parties: [] as FeaturedPartyCard[],
+    suggestions: [] as SuggestedUserCard[],
+    categories: [] as DiscoverCategoryCard[],
   })
 
-  useEffect(() => {
-    loadDiscoverData()
-  }, [timeFilter, categoryFilter])
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeParties: 0,
+    videosWatched: 0,
+    newUsersToday: 0,
+  })
 
-  const loadDiscoverData = async () => {
+  const loadDiscoverData = useCallback(async () => {
+    const categoryParam = categoryFilter === "all" ? undefined : categoryFilter
+    const timeRangeParam = timeFilter === "all" ? undefined : timeFilter
+
     setIsLoading(true)
+
     try {
-      // Simulate API call with mock data
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      setTrendingVideos([
-        {
-          id: "1",
-          title: "Epic Movie Night: The Matrix Trilogy Marathon",
-          description: "Join us for an incredible journey through the Matrix universe",
-          thumbnail: "/placeholder.svg?height=200&width=350&text=Matrix+Marathon",
-          duration: 8640,
-          views: 45231,
-          likes: 3421,
-          createdAt: "2024-01-15T10:00:00Z",
-          author: {
-            id: "user1",
-            username: "CinemaKing",
-            avatar: "/placeholder-user.jpg",
-            isVerified: true,
-          },
-          tags: ["Action", "Sci-Fi", "Marathon"],
-          trendingScore: 95,
-        },
-        {
-          id: "2",
-          title: "Horror Movie Collection: Best Scares of 2024",
-          description: "Spine-chilling collection of the year's best horror films",
-          thumbnail: "/placeholder.svg?height=200&width=350&text=Horror+Collection",
-          duration: 5400,
-          views: 32156,
-          likes: 2847,
-          createdAt: "2024-01-14T15:30:00Z",
-          author: {
-            id: "user2",
-            username: "ScreamQueen",
-            avatar: "/placeholder-user.jpg",
-            isVerified: false,
-          },
-          tags: ["Horror", "Thriller", "2024"],
-          trendingScore: 88,
-        },
+      const [
+        discoverPayload,
+        trendingVideosPayload,
+        trendingPartiesPayload,
+        recommendedPartiesPayload,
+        userSuggestionsPayload,
+        analyticsPayload,
+      ] = await Promise.all([
+        searchAPI.discover({
+          category: categoryParam,
+          trending: true,
+          recommended: true,
+        }),
+        videosAPI.getTrending({ category: categoryParam, limit: 12 }),
+        partiesAPI.getTrendingParties({ limit: 6, time_range: timeRangeParam }),
+        partiesAPI.getRecommendations({ limit: 6 }),
+        usersAPI.getUserSuggestions(),
+        analyticsAPI.getDashboard(timeRangeParam),
       ])
 
-      setFeaturedParties([
-        {
-          id: "party1",
-          name: "Friday Night Movie Club",
-          description: "Weekly gathering for movie enthusiasts. Tonight: Classic 80s films!",
-          thumbnail: "/placeholder.svg?height=200&width=350&text=Movie+Club",
-          host: {
-            id: "host1",
-            username: "MovieMaster",
-            avatar: "/placeholder-user.jpg",
-            isVerified: true,
-          },
-          scheduledFor: "2024-01-19T20:00:00Z",
-          isActive: true,
-          participantCount: 47,
-          maxParticipants: 100,
-          tags: ["Weekly", "80s", "Classics"],
-          category: "Movies",
-          isFeatured: true,
-        },
-        {
-          id: "party2",
-          name: "Anime Marathon Weekend",
-          description: "48-hour anime marathon featuring the best series of all time",
-          thumbnail: "/placeholder.svg?height=200&width=350&text=Anime+Marathon",
-          host: {
-            id: "host2",
-            username: "AnimeGuru",
-            avatar: "/placeholder-user.jpg",
-            isVerified: true,
-          },
-          scheduledFor: "2024-01-20T12:00:00Z",
-          isActive: false,
-          participantCount: 156,
-          maxParticipants: 200,
-          tags: ["Anime", "Marathon", "Weekend"],
-          category: "Anime",
-          isFeatured: true,
-        },
+      const discoverData: DiscoverContent =
+        discoverPayload ?? {
+          featured_videos: [],
+          trending_parties: [],
+          recommended_content: [],
+          popular_categories: [],
+        }
+
+      const videosSource =
+        Array.isArray(discoverData.featured_videos) && discoverData.featured_videos.length > 0
+          ? discoverData.featured_videos
+          : Array.isArray(trendingVideosPayload)
+            ? trendingVideosPayload
+            : []
+
+      const normalizedVideos = Array.isArray(videosSource)
+        ? videosSource.map((video) => buildVideoCard(video))
+        : []
+
+      const discoverParties: FeaturedPartyCard[] = Array.isArray(discoverData.trending_parties)
+        ? discoverData.trending_parties.map((party) => buildPartyCard(party, "trending"))
+        : []
+
+      const trendingParties: FeaturedPartyCard[] = Array.isArray(trendingPartiesPayload)
+        ? trendingPartiesPayload.map((party) => buildPartyCard(party, "trending"))
+        : []
+
+      const recommendedParties: FeaturedPartyCard[] = Array.isArray(recommendedPartiesPayload)
+        ? recommendedPartiesPayload.map((party) => buildPartyCard(party, "recommended"))
+        : []
+
+      const normalizedParties = dedupePartyCards([
+        ...discoverParties,
+        ...trendingParties,
+        ...recommendedParties,
       ])
 
-      setSuggestedUsers([
-        {
-          id: "suggest1",
-          username: "FilmBuff2024",
-          firstName: "Alex",
-          lastName: "Johnson",
-          avatar: "/placeholder-user.jpg",
-          bio: "Movie enthusiast and part-time film critic. Love discussing plot twists!",
-          location: "Los Angeles, CA",
-          isOnline: true,
-          isVerified: false,
-          mutualFriends: 12,
-          commonInterests: ["Action Movies", "Sci-Fi", "Film Analysis"],
-          stats: {
-            videosUploaded: 23,
-            partiesHosted: 8,
-            friendsCount: 156,
-          },
-          reasonForSuggestion: "mutual_friends",
-        },
-        {
-          id: "suggest2",
-          username: "CinematicSoul",
-          firstName: "Sarah",
-          lastName: "Chen",
-          avatar: "/placeholder-user.jpg",
-          bio: "Independent filmmaker and cinema lover. Always up for a good discussion!",
-          location: "New York, NY",
-          isOnline: false,
-          isVerified: true,
-          mutualFriends: 8,
-          commonInterests: ["Independent Films", "Documentaries", "Film Making"],
-          stats: {
-            videosUploaded: 45,
-            partiesHosted: 15,
-            friendsCount: 289,
-          },
-          reasonForSuggestion: "common_interests",
-        },
-      ])
+      const recommendedUsers: SuggestedUserCard[] = Array.isArray(discoverData.recommended_content)
+        ? discoverData.recommended_content
+            .filter((item: DiscoverRecommendation) => item?.type === "user")
+            .map((item: DiscoverRecommendation) =>
+              buildSuggestedUserCard(
+                (item?.metadata ?? item) as Record<string, any>,
+                "popular",
+              ),
+            )
+        : []
 
-      setTrendingCategories([
-        {
-          id: "action",
-          name: "Action & Adventure",
-          description: "High-octane thrills and epic adventures",
-          icon: "⚡",
-          videoCount: 1247,
-          isGrowing: true,
-          color: "from-red-500 to-orange-500",
-        },
-        {
-          id: "comedy",
-          name: "Comedy",
-          description: "Laugh-out-loud moments and feel-good content",
-          icon: "😂",
-          videoCount: 892,
-          isGrowing: true,
-          color: "from-yellow-500 to-pink-500",
-        },
-        {
-          id: "horror",
-          name: "Horror & Thriller",
-          description: "Spine-chilling scares and suspenseful moments",
-          icon: "👻",
-          videoCount: 634,
-          isGrowing: false,
-          color: "from-purple-500 to-red-500",
-        },
-        {
-          id: "scifi",
-          name: "Sci-Fi & Fantasy",
-          description: "Futuristic worlds and magical realms",
-          icon: "🚀",
-          videoCount: 756,
-          isGrowing: true,
-          color: "from-blue-500 to-purple-500",
-        },
-      ])
+      const suggestionResults: SuggestedUserCard[] = Array.isArray(userSuggestionsPayload)
+        ? userSuggestionsPayload.map((user: Record<string, any>) =>
+            buildSuggestedUserCard(user, "mutual_friends"),
+          )
+        : []
+
+      const normalizedSuggestions = dedupeSuggestions([...recommendedUsers, ...suggestionResults])
+
+      const normalizedCategoryCards: DiscoverCategoryCard[] = Array.isArray(
+        discoverData.popular_categories,
+      )
+        ? discoverData.popular_categories.map((category, index: number) =>
+            buildCategoryCard(category, index),
+          )
+        : []
+
+      const statsSource = {
+        ...(discoverData.platform_stats ?? {}),
+        ...(analyticsPayload?.overview ?? {}),
+      }
+      const computedStats = {
+        totalUsers: safeNumber(
+          statsSource?.total_users ?? statsSource?.totalUsers ?? statsSource?.user_count,
+          0,
+        ),
+        activeParties: safeNumber(
+          statsSource?.active_parties ?? statsSource?.total_parties ?? statsSource?.party_count,
+          normalizedParties.length,
+        ),
+        videosWatched: safeNumber(
+          statsSource?.videos_watched ??
+            statsSource?.total_watch_time_hours ??
+            statsSource?.total_watch_time ??
+            statsSource?.watch_time,
+          0,
+        ),
+        newUsersToday: safeNumber(
+          statsSource?.new_users_today ??
+            statsSource?.daily_new_users ??
+            statsSource?.newUsers ??
+            statsSource?.new_users,
+          0,
+        ),
+      }
+
+      setStats(computedStats)
+      setDefaultCollections({
+        videos: normalizedVideos,
+        parties: normalizedParties,
+        suggestions: normalizedSuggestions,
+        categories: normalizedCategoryCards,
+      })
     } catch (error) {
       console.error("Failed to load discover data:", error)
       toast({
@@ -310,26 +679,132 @@ export default function DiscoverPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [categoryFilter, timeFilter, toast])
+
+  useEffect(() => {
+    void loadDiscoverData()
+  }, [loadDiscoverData])
+
+  useEffect(() => {
+    if (searchQuery.trim().length >= 2) {
+      return
+    }
+
+    setTrendingVideos(defaultCollections.videos)
+    setFeaturedParties(defaultCollections.parties)
+    setSuggestedUsers(defaultCollections.suggestions)
+    setTrendingCategories(defaultCollections.categories)
+  }, [defaultCollections, searchQuery])
+
+  useEffect(() => {
+    const query = searchQuery.trim()
+    if (query.length < 2) {
+      return
+    }
+
+    let ignore = false
+
+    const runSearch = async () => {
+      setIsLoading(true)
+      try {
+        const categoryParam = categoryFilter === "all" ? undefined : categoryFilter
+
+        const [videoResults, partyResults, userResults] = await Promise.all([
+          videosAPI.searchVideos({ q: query, category: categoryParam, ordering: "relevance" }),
+          partiesAPI.searchParties({ q: query, page: 1 }),
+          usersAPI.searchUsers({ q: query, limit: 12, sort: "relevance" }),
+        ])
+
+        if (ignore) {
+          return
+        }
+
+        const normalizedVideos = Array.isArray(videoResults?.results)
+          ? videoResults.results.map((video: any) => buildVideoCard(video))
+          : []
+
+        const normalizedParties = dedupePartyCards(
+          Array.isArray(partyResults?.results)
+            ? partyResults.results.map((party: any) => buildPartyCard(party, "trending"))
+            : [],
+        )
+
+        const normalizedSuggestions = dedupeSuggestions(
+          Array.isArray(userResults?.results)
+            ? userResults.results.map((user: any) =>
+                buildSuggestedUserCard(user, "common_interests"),
+              )
+            : [],
+        )
+
+        const normalizedCategories =
+          Array.isArray(videoResults?.facets?.categories) &&
+          videoResults.facets.categories.length > 0
+            ? videoResults.facets.categories.map((facet: any, index: number) =>
+                buildCategoryCard(
+                  {
+                    id: facet.name,
+                    name: facet.name,
+                    description: `${facet.count} videos available`,
+                    content_count: facet.count,
+                  },
+                  index,
+                ),
+              )
+            : defaultCollections.categories
+
+        setTrendingVideos(normalizedVideos)
+        setFeaturedParties(normalizedParties)
+        setSuggestedUsers(normalizedSuggestions)
+        setTrendingCategories(normalizedCategories)
+      } catch (error) {
+        if (!ignore) {
+          console.error("Failed to search discover content:", error)
+          toast({
+            title: "Search failed",
+            description: "We couldn't load results for your query. Please try again.",
+            variant: "destructive",
+          })
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    void runSearch()
+
+    return () => {
+      ignore = true
+    }
+  }, [searchQuery, categoryFilter, defaultCollections.categories, toast])
 
   const handleSendFriendRequest = async (userId: string) => {
     try {
-      setSuggestedUsers((prev) => prev.filter((u) => u.id !== userId))
+      await usersAPI.sendFriendRequestToUser(userId)
+
+      setSuggestedUsers((prev) => prev.filter((user) => user.id !== userId))
+      setDefaultCollections((prev) => ({
+        ...prev,
+        suggestions: prev.suggestions.filter((user) => user.id !== userId),
+      }))
+
       toast({
-        title: "Friend Request Sent",
-        description: "Your friend request has been sent successfully.",
+        title: "Friend request sent",
+        description: "Your connection request is on its way.",
       })
     } catch (error) {
       console.error("Failed to send friend request:", error)
       toast({
-        title: "Error",
-        description: "Failed to send friend request.",
+        title: "Unable to send request",
+        description: "We couldn't send your friend request. Please try again.",
         variant: "destructive",
       })
     }
   }
 
-  const getSuggestionReasonText = (reason: SuggestedUser["reasonForSuggestion"]) => {
+  const getSuggestionReasonText = (reason: SuggestionReason) => {
     switch (reason) {
       case "mutual_friends":
         return "Mutual friends"
@@ -339,12 +814,16 @@ export default function DiscoverPage() {
         return "Popular user"
       case "new_user":
         return "New to platform"
+      case "recent_activity":
+        return "Recently active"
+      case "similar_content":
+        return "Similar to your interests"
       default:
         return "Suggested for you"
     }
   }
 
-  const getSuggestionIcon = (reason: SuggestedUser["reasonForSuggestion"]) => {
+  const getSuggestionIcon = (reason: SuggestionReason) => {
     switch (reason) {
       case "mutual_friends":
         return <Users className="w-3 h-3" />
@@ -354,18 +833,13 @@ export default function DiscoverPage() {
         return <Crown className="w-3 h-3" />
       case "new_user":
         return <Sparkles className="w-3 h-3" />
+      case "recent_activity":
+        return <Zap className="w-3 h-3" />
+      case "similar_content":
+        return <Globe className="w-3 h-3" />
       default:
         return <Star className="w-3 h-3" />
     }
-  }
-
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`
-    }
-    return `${minutes}m`
   }
 
   return (
@@ -436,7 +910,7 @@ export default function DiscoverPage() {
                   +12%
                 </Badge>
               </div>
-              <div className="text-2xl font-bold text-white">{stats.totalUsers.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-white">{formatStatValue(stats.totalUsers)}</div>
               <div className="text-sm text-gray-400">Total Users</div>
             </div>
 
@@ -447,7 +921,7 @@ export default function DiscoverPage() {
                   Live
                 </Badge>
               </div>
-              <div className="text-2xl font-bold text-white">{stats.activeParties}</div>
+              <div className="text-2xl font-bold text-white">{formatStatValue(stats.activeParties)}</div>
               <div className="text-sm text-gray-400">Active Parties</div>
             </div>
 
@@ -458,7 +932,7 @@ export default function DiscoverPage() {
                   +8%
                 </Badge>
               </div>
-              <div className="text-2xl font-bold text-white">{stats.videosWatched.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-white">{formatStatValue(stats.videosWatched)}</div>
               <div className="text-sm text-gray-400">Videos Watched</div>
             </div>
 
@@ -469,7 +943,7 @@ export default function DiscoverPage() {
                   New
                 </Badge>
               </div>
-              <div className="text-2xl font-bold text-white">{stats.newUsersToday}</div>
+              <div className="text-2xl font-bold text-white">{formatStatValue(stats.newUsersToday)}</div>
               <div className="text-sm text-gray-400">New Today</div>
             </div>
           </div>
@@ -548,7 +1022,7 @@ export default function DiscoverPage() {
                             </div>
 
                             <div className="absolute bottom-2 right-2 bg-black/75 text-white text-xs px-2 py-1 rounded">
-                              {formatDuration(video.duration)}
+                              {video.durationLabel}
                             </div>
 
                             <div className="absolute top-2 right-2">
@@ -565,13 +1039,13 @@ export default function DiscoverPage() {
 
                             <div className="flex items-center space-x-2">
                               <Avatar className="w-6 h-6">
-                                <AvatarImage src={video.author.avatar || "/placeholder.svg"} />
+                                <AvatarImage src={video.uploader.avatar || "/placeholder.svg"} />
                                 <AvatarFallback className="text-xs bg-purple-500 text-white">
-                                  {video.author.username[0]}
+                                  {video.uploader.name.charAt(0)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="text-sm text-gray-300">{video.author.username}</span>
-                              {video.author.isVerified && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
+                              <span className="text-sm text-gray-300">{video.uploader.name}</span>
+                              {video.uploader.isVerified && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
                             </div>
 
                             <div className="flex items-center justify-between text-xs text-gray-400">
@@ -658,15 +1132,15 @@ export default function DiscoverPage() {
                             <div className="relative aspect-video">
                               <img
                                 src={party.thumbnail || "/placeholder.svg"}
-                                alt={party.name}
+                                alt={party.title}
                                 className="w-full h-full object-cover"
                               />
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200" />
 
-                              {party.isFeatured && (
+                              {party.highlight === "recommended" && (
                                 <div className="absolute top-2 left-2 bg-yellow-500 text-black text-xs px-2 py-1 rounded-full flex items-center gap-1 font-medium">
                                   <Crown className="w-3 h-3" />
-                                  Featured
+                                  Recommended
                                 </div>
                               )}
 
@@ -683,7 +1157,7 @@ export default function DiscoverPage() {
                           <div className="p-6 space-y-4">
                             <div>
                               <h3 className="font-semibold text-lg text-white mb-2 group-hover:text-yellow-300 transition-colors">
-                                {party.name}
+                                {party.title}
                               </h3>
                               <p className="text-sm text-gray-400 line-clamp-2">{party.description}</p>
                             </div>
@@ -692,10 +1166,10 @@ export default function DiscoverPage() {
                               <Avatar className="w-6 h-6">
                                 <AvatarImage src={party.host.avatar || "/placeholder.svg"} />
                                 <AvatarFallback className="text-xs bg-yellow-500 text-black">
-                                  {party.host.username[0]}
+                                  {party.host.name.charAt(0)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="text-sm text-gray-300">Hosted by {party.host.username}</span>
+                              <span className="text-sm text-gray-300">Hosted by {party.host.name}</span>
                               {party.host.isVerified && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
                             </div>
 
@@ -896,7 +1370,7 @@ export default function DiscoverPage() {
                         >
                           <div className="text-center space-y-4">
                             <div
-                              className={`w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br ${category.color} flex items-center justify-center text-2xl`}
+                              className={`w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br ${category.colorClass} flex items-center justify-center text-2xl`}
                             >
                               {category.icon}
                             </div>
@@ -911,7 +1385,7 @@ export default function DiscoverPage() {
                             <div className="flex items-center justify-center space-x-4 text-sm text-gray-400">
                               <div className="flex items-center space-x-1">
                                 <Video className="w-4 h-4" />
-                                <span>{category.videoCount.toLocaleString()} videos</span>
+                                <span>{category.itemCount.toLocaleString()} videos</span>
                               </div>
                               {category.isGrowing && (
                                 <div className="flex items-center space-x-1 text-green-400">

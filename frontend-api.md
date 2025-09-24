@@ -1052,13 +1052,23 @@ Based on my analysis of the codebase, here is a comprehensive list of all API re
 - **Expected Response**:
   ```typescript
   {
-    success: boolean
-    content: DiscoverContent
-    recommendations: {
-      videos: any[]
-      parties: any[]
-      users: any[]
-    }
+    featured_videos: Array<Record<string, any>>
+    trending_parties: Array<Record<string, any>>
+    recommended_content: Array<{
+      type: string
+      metadata?: Record<string, any>
+      [key: string]: any
+    }>
+    popular_categories: Array<{
+      id?: string | number
+      name: string
+      description?: string
+      content_count?: number
+      trend_direction?: 'up' | 'down' | 'steady'
+      is_growing?: boolean
+      [key: string]: any
+    }>
+    platform_stats?: Record<string, any>
   }
   ```
 

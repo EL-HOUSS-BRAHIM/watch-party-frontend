@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MessageCircle, Phone, Video, MoreHorizontal } from 'lucide-react';
+import { usersAPI } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface OnlineFriend {
   id: string;
@@ -22,6 +24,69 @@ interface OnlineFriend {
   };
   lastSeen?: string;
 }
+
+const fallbackId = (prefix: string) =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `${prefix}-${crypto.randomUUID()}`
+    : `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+
+const resolveStatus = (status: any, isOnlineFallback?: boolean): OnlineFriend['status'] => {
+  const normalized = typeof status === 'string' ? status.toLowerCase() : undefined;
+
+  switch (normalized) {
+    case 'online':
+    case 'available':
+      return 'online';
+    case 'idle':
+    case 'away':
+      return 'idle';
+    case 'busy':
+    case 'dnd':
+      return 'busy';
+    case 'offline':
+    case 'hidden':
+      return 'offline';
+    default:
+      return isOnlineFallback ? 'online' : 'offline';
+  }
+};
+
+const normalizeActivity = (activity: any): OnlineFriend['activity'] | undefined => {
+  if (!activity) return undefined;
+
+  const rawType = (activity.type ?? activity.activity_type ?? '').toString().toLowerCase();
+  let type: OnlineFriend['activity']['type'] = 'watching';
+
+  if (rawType.includes('party')) {
+    type = 'in_party';
+  } else if (rawType.includes('brows')) {
+    type = 'browsing';
+  }
+
+  const details =
+    activity.details ??
+    activity.title ??
+    activity.name ??
+    activity.description ??
+    '';
+
+  return {
+    type,
+    details,
+    partyId: activity.party_id ?? activity.partyId ?? activity.room_id ?? undefined,
+    videoId: activity.video_id ?? activity.videoId ?? undefined,
+  };
+};
+
+const normalizeOnlineFriend = (friend: any): OnlineFriend => ({
+  id: String(friend?.id ?? friend?.user_id ?? fallbackId('friend')),
+  username: friend?.username ?? friend?.handle ?? friend?.name ?? 'user',
+  displayName: friend?.display_name ?? friend?.name ?? friend?.username ?? 'Friend',
+  avatar: friend?.avatar ?? friend?.avatar_url ?? '/placeholder-user.jpg',
+  status: resolveStatus(friend?.status ?? friend?.presence, friend?.is_online ?? true),
+  activity: normalizeActivity(friend?.current_activity ?? friend?.activity),
+  lastSeen: friend?.last_seen ?? friend?.last_activity ?? undefined,
+});
 
 const StatusIndicator = ({ status }: { status: OnlineFriend['status'] }) => {
   const statusConfig = {
@@ -69,79 +134,40 @@ const ActivityBadge = ({ activity }: { activity: OnlineFriend['activity'] }) => 
 export default function OnlineStatusIndicators() {
   const [friends, setFriends] = useState<OnlineFriend[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalOnline, setTotalOnline] = useState<number | null>(null);
+  const { toast } = useToast();
+  const errorNotifiedRef = useRef(false);
 
-  useEffect(() => {
-    fetchOnlineFriends();
-    
-    // Set up real-time updates
-    const interval = setInterval(fetchOnlineFriends, 30000); // Update every 30 seconds
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchOnlineFriends = async () => {
+  const fetchOnlineFriends = useCallback(async () => {
     try {
-      // Mock data - replace with actual API call
-      const mockFriends: OnlineFriend[] = [
-        {
-          id: '1',
-          username: 'alex_movie_fan',
-          displayName: 'Alex Chen',
-          avatar: '/placeholder-user.jpg',
-          status: 'online',
-          activity: {
-            type: 'watching',
-            details: 'The Matrix',
-            videoId: 'video123',
-          },
-        },
-        {
-          id: '2',
-          username: 'sarah_streamer',
-          displayName: 'Sarah Johnson',
-          avatar: '/placeholder-user.jpg',
-          status: 'online',
-          activity: {
-            type: 'in_party',
-            details: 'Horror Movie Night',
-            partyId: 'party456',
-          },
-        },
-        {
-          id: '3',
-          username: 'mike_director',
-          displayName: 'Mike Rodriguez',
-          avatar: '/placeholder-user.jpg',
-          status: 'idle',
-          activity: {
-            type: 'browsing',
-            details: 'Exploring new releases',
-          },
-        },
-        {
-          id: '4',
-          username: 'emma_critic',
-          displayName: 'Emma Watson',
-          avatar: '/placeholder-user.jpg',
-          status: 'busy',
-        },
-        {
-          id: '5',
-          username: 'david_casual',
-          displayName: 'David Kim',
-          avatar: '/placeholder-user.jpg',
-          status: 'offline',
-          lastSeen: '2 hours ago',
-        },
-      ];
-
-      setFriends(mockFriends);
+      const response = await usersAPI.getOnlineStatus();
+      const results = Array.isArray(response?.online_friends) ? response.online_friends : [];
+      setFriends(results.map((friend: any) => normalizeOnlineFriend(friend)));
+      setTotalOnline(typeof response?.total_online === 'number' ? response.total_online : results.length);
+      errorNotifiedRef.current = false;
     } catch (error) {
       console.error('Failed to fetch online friends:', error);
+      if (!errorNotifiedRef.current) {
+        toast({
+          title: 'Unable to update friend status',
+          description: 'We will retry automatically.',
+          variant: 'destructive',
+        });
+        errorNotifiedRef.current = true;
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchOnlineFriends();
+
+    // Set up real-time updates
+    const interval = setInterval(fetchOnlineFriends, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [fetchOnlineFriends]);
 
   const onlineFriends = friends.filter(friend => friend.status !== 'offline');
   const offlineFriends = friends.filter(friend => friend.status === 'offline');
@@ -189,7 +215,7 @@ export default function OnlineStatusIndicators() {
       <CardHeader>
         <CardTitle className="text-lg flex items-center justify-between">
           Friends
-          <Badge variant="secondary">{onlineFriends.length} online</Badge>
+          <Badge variant="secondary">{(totalOnline ?? onlineFriends.length)} online</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
