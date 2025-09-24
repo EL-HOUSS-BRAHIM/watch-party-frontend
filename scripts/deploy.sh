@@ -19,6 +19,7 @@ PROJECT_PATH="/var/www/$PROJECT_NAME"
 FRONTEND_DOMAIN="watch-party.brahim-elhouss.me"
 BACKEND_DOMAIN="be-watch-party.brahim-elhouss.me"
 PM2_APP_NAME="watch-party-frontend"
+NGINX_CONFIG_NAME="watch-party-frontend"
 
 # Helper functions
 print_header() {
@@ -134,19 +135,23 @@ install_nginx_http() {
     print_success "Nginx installed successfully"
     
     # Create Nginx configuration for HTTP
-    print_info "Creating Nginx HTTP configuration..."
+    print_info "Creating Nginx configuration for frontend: $NGINX_CONFIG_NAME..."
     
-    cat > "/etc/nginx/sites-available/$PROJECT_NAME" << EOF
+    cat > "/etc/nginx/sites-available/$NGINX_CONFIG_NAME" << EOF
 server {
     listen 80;
     server_name $FRONTEND_DOMAIN;
     
-    # Security headers
+    # Frontend-specific configuration
+    root /var/www/html;
+    index index.html index.htm;
+    
+    # Security headers for frontend
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://$BACKEND_DOMAIN" always;
     
     # Cloudflare real IP configuration
     set_real_ip_from 103.21.244.0/22;
@@ -173,9 +178,9 @@ server {
     set_real_ip_from 2a06:98c0::/29;
     real_ip_header CF-Connecting-IP;
     
-    # Proxy configuration
+    # Frontend Next.js proxy configuration
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -185,53 +190,94 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_cache_bypass \$http_upgrade;
         
-        # WebSocket support
+        # Frontend-specific headers
+        proxy_set_header X-Frontend-Request "true";
+        
+        # WebSocket support for Next.js hot reload and features
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         
-        # Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+        # Timeouts optimized for frontend
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
     }
     
-    # Static files caching
+    # Next.js static files with aggressive caching
     location /_next/static/ {
-        proxy_pass http://localhost:3000;
-        proxy_cache_valid 200 302 10m;
-        proxy_cache_valid 404 1m;
+        proxy_pass http://127.0.0.1:3000;
+        expires 1y;
         add_header Cache-Control "public, immutable, max-age=31536000";
+        add_header X-Frontend-Static "true";
     }
     
-    # Health check endpoint
-    location /api/health {
-        proxy_pass http://localhost:3000;
+    # Frontend API routes (if any internal APIs)
+    location /api/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        add_header X-Frontend-API "true";
+    }
+    
+    # Health check for frontend
+    location /health {
+        proxy_pass http://127.0.0.1:3000/api/health;
         access_log off;
+        add_header X-Frontend-Health "true";
     }
 }
 EOF
 
-    # Enable the site
-    ln -sf "/etc/nginx/sites-available/$PROJECT_NAME" "/etc/nginx/sites-enabled/"
-    
-    # Remove default site if exists
-    rm -f /etc/nginx/sites-enabled/default
-    
-    # Test Nginx configuration
-    print_info "Testing Nginx configuration..."
+    # Test Nginx configuration before enabling
+    print_info "Testing Nginx configuration syntax..."
     if nginx -t; then
-        print_success "Nginx configuration is valid"
+        print_success "Nginx configuration syntax is valid"
     else
-        print_error "Nginx configuration is invalid"
+        print_error "Nginx configuration syntax is invalid!"
+        print_error "Please check the configuration file: /etc/nginx/sites-available/$NGINX_CONFIG_NAME"
+        exit 1
+    fi
+
+    # Enable the frontend site configuration
+    print_info "Enabling frontend site configuration..."
+    ln -sf "/etc/nginx/sites-available/$NGINX_CONFIG_NAME" "/etc/nginx/sites-enabled/"
+    
+    # Remove default site if it exists (only if it's still the default)
+    if [ -L "/etc/nginx/sites-enabled/default" ] && [ -f "/etc/nginx/sites-available/default" ]; then
+        print_info "Removing default Nginx site..."
+        rm -f /etc/nginx/sites-enabled/default
+    fi
+    
+    # Test configuration again after enabling
+    print_info "Testing complete Nginx configuration..."
+    if nginx -t; then
+        print_success "Complete Nginx configuration is valid"
+    else
+        print_error "Nginx configuration failed after enabling site!"
+        print_error "Disabling the site to prevent issues..."
+        rm -f "/etc/nginx/sites-enabled/$NGINX_CONFIG_NAME"
         exit 1
     fi
     
     # Start and enable Nginx
+    print_info "Starting Nginx service..."
     systemctl start nginx
     systemctl enable nginx
     
-    print_success "Nginx installed and configured for HTTP!"
-    print_warning "Your site is now accessible at: http://$FRONTEND_DOMAIN"
+    # Verify Nginx is running
+    if systemctl is-active --quiet nginx; then
+        print_success "Nginx is running successfully"
+    else
+        print_error "Failed to start Nginx service"
+        systemctl status nginx --no-pager
+        exit 1
+    fi
+    
+    print_success "Frontend Nginx configuration completed successfully!"
+    print_success "Frontend site: http://$FRONTEND_DOMAIN"
+    print_info "Nginx configuration file: /etc/nginx/sites-available/$NGINX_CONFIG_NAME"
     print_info "Make sure your domain DNS is pointing to this server"
     
     # Ask about SSL
@@ -285,9 +331,9 @@ install_nginx_https() {
     fi
     
     # Create HTTPS Nginx configuration
-    print_info "Creating Nginx HTTPS configuration..."
+    print_info "Creating Nginx HTTPS configuration for frontend: $NGINX_CONFIG_NAME..."
     
-    cat > "/etc/nginx/sites-available/$PROJECT_NAME" << EOF
+    cat > "/etc/nginx/sites-available/$NGINX_CONFIG_NAME" << EOF
 # Redirect HTTP to HTTPS
 server {
     listen 80;
@@ -314,12 +360,12 @@ server {
     # HSTS (HTTP Strict Transport Security)
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     
-    # Security headers
+    # Security headers for frontend with HTTPS
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://$BACKEND_DOMAIN" always;
     
     # Cloudflare real IP configuration
     set_real_ip_from 103.21.244.0/22;
@@ -346,9 +392,9 @@ server {
     set_real_ip_from 2a06:98c0::/29;
     real_ip_header CF-Connecting-IP;
     
-    # Proxy configuration
+    # Frontend Next.js proxy configuration with HTTPS
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -358,53 +404,59 @@ server {
         proxy_set_header X-Forwarded-Proto https;
         proxy_cache_bypass \$http_upgrade;
         
+        # Frontend-specific headers
+        proxy_set_header X-Frontend-Request "true";
+        proxy_set_header X-Frontend-SSL "true";
+        
         # WebSocket support for Next.js
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         
-        # Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+        # Optimized timeouts for frontend
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
         
-        # Buffer settings
+        # Buffer settings for frontend
         proxy_buffering on;
-        proxy_buffer_size 128k;
-        proxy_buffers 4 256k;
-        proxy_busy_buffers_size 256k;
+        proxy_buffer_size 64k;
+        proxy_buffers 4 64k;
+        proxy_busy_buffers_size 64k;
     }
     
-    # Static files caching with long expiry
+    # Next.js static files with long-term caching
     location /_next/static/ {
-        proxy_pass http://localhost:3000;
-        proxy_cache_valid 200 302 1y;
-        proxy_cache_valid 404 1m;
+        proxy_pass http://127.0.0.1:3000;
+        expires 1y;
         add_header Cache-Control "public, immutable, max-age=31536000";
+        add_header X-Frontend-Static "true";
         
-        # Add CORS headers if needed
-        add_header Access-Control-Allow-Origin "*";
-        add_header Access-Control-Allow-Methods "GET, POST, OPTIONS";
+        # CORS headers for frontend assets
+        add_header Access-Control-Allow-Origin "https://$FRONTEND_DOMAIN";
+        add_header Access-Control-Allow-Methods "GET, OPTIONS";
         add_header Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range";
     }
     
-    # API routes
+    # Frontend API routes
     location /api/ {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
+        add_header X-Frontend-API "true";
         
-        # API-specific timeouts
-        proxy_connect_timeout 30s;
-        proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
+        # API-specific timeouts for frontend
+        proxy_connect_timeout 15s;
+        proxy_send_timeout 15s;
+        proxy_read_timeout 15s;
     }
     
-    # Health check endpoint
-    location /api/health {
-        proxy_pass http://localhost:3000;
+    # Health check for frontend
+    location /health {
+        proxy_pass http://127.0.0.1:3000/api/health;
         access_log off;
+        add_header X-Frontend-Health "true";
     }
     
     # Security: deny access to hidden files
@@ -422,22 +474,31 @@ server {
         text/css
         text/xml
         text/javascript
-        application/javascript
-        application/xml+rss
-        application/json
-        application/xml
-        image/svg+xml;
-}
 EOF
     
-    # Test Nginx configuration
-    print_info "Testing Nginx HTTPS configuration..."
+    # Test Nginx HTTPS configuration syntax
+    print_info "Testing Nginx HTTPS configuration syntax..."
     if nginx -t; then
-        print_success "Nginx configuration is valid"
+        print_success "Nginx HTTPS configuration syntax is valid"
     else
-        print_error "Nginx configuration is invalid"
+        print_error "Nginx HTTPS configuration syntax is invalid!"
+        print_error "Please check the configuration file: /etc/nginx/sites-available/$NGINX_CONFIG_NAME"
         exit 1
     fi
+    
+    # Reload Nginx with new HTTPS configuration
+    print_info "Reloading Nginx with HTTPS configuration..."
+    if systemctl reload nginx; then
+        print_success "Nginx reloaded successfully with HTTPS configuration"
+    else
+        print_error "Failed to reload Nginx with HTTPS configuration"
+        systemctl status nginx --no-pager
+        exit 1
+    fi
+    print_success "Frontend HTTPS configuration completed successfully!"
+    print_success "Frontend site with SSL: https://$FRONTEND_DOMAIN"
+    print_info "Nginx HTTPS configuration file: /etc/nginx/sites-available/$NGINX_CONFIG_NAME"
+    print_info "SSL certificate will be automatically renewed (if using Let's Encrypt)"
     
     # Reload Nginx
     systemctl reload nginx
@@ -489,6 +550,49 @@ stop_services() {
     systemctl status nginx --no-pager -l || echo "Nginx is not running"
     
     print_success "All services stopped successfully!"
+    
+    # Show final status
+    print_info "Final service status check:"
+    echo "Nginx sites enabled:"
+    ls -la /etc/nginx/sites-enabled/ 2>/dev/null || echo "No sites enabled"
+}
+
+# Show current configuration status
+show_status() {
+    print_header "Current Deployment Status"
+    
+    # Check PM2 status
+    print_info "PM2 Status:"
+    if command -v pm2 &> /dev/null; then
+        pm2 list 2>/dev/null || echo "No PM2 processes found"
+    else
+        echo "PM2 not installed"
+    fi
+    
+    echo ""
+    
+    # Check Nginx status
+    print_info "Nginx Status:"
+    if systemctl is-active --quiet nginx; then
+        print_success "Nginx is running"
+        echo "Enabled sites:"
+        ls -la /etc/nginx/sites-enabled/ 2>/dev/null || echo "No sites enabled"
+        echo ""
+        echo "Available configurations:"
+        ls -la /etc/nginx/sites-available/ | grep "$NGINX_CONFIG_NAME" 2>/dev/null || echo "No frontend configuration found"
+    else
+        print_warning "Nginx is not running"
+    fi
+    
+    echo ""
+    
+    # Check if frontend is accessible
+    print_info "Testing frontend accessibility:"
+    if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000 | grep -q "200"; then
+        print_success "Frontend application is responding on port 3000"
+    else
+        print_warning "Frontend application is not responding on port 3000"
+    fi
 }
 
 # Main menu
@@ -504,10 +608,11 @@ show_menu() {
     echo ""
     echo "Select an option:"
     echo "1) Initialize PM2 on the project"
-    echo "2) Install Nginx with HTTP configuration"
+    echo "2) Install Nginx with HTTP configuration (Frontend only)"
     echo "3) Configure Nginx with HTTPS (requires SSL certificate)"
     echo "4) Stop all services"
-    echo "5) Exit"
+    echo "5) Show current status"
+    echo "6) Exit"
     echo ""
 }
 
@@ -515,7 +620,7 @@ show_menu() {
 main() {
     while true; do
         show_menu
-        read -p "Enter your choice (1-5): " choice
+        read -p "Enter your choice (1-6): " choice
         echo ""
         
         case $choice in
@@ -540,11 +645,16 @@ main() {
                 read -p "Press Enter to continue..."
                 ;;
             5)
+                show_status
+                echo ""
+                read -p "Press Enter to continue..."
+                ;;
+            6)
                 print_info "Exiting..."
                 exit 0
                 ;;
             *)
-                print_error "Invalid option. Please choose 1-5."
+                print_error "Invalid option. Please choose 1-6."
                 echo ""
                 read -p "Press Enter to continue..."
                 ;;
