@@ -79,90 +79,34 @@ export default function FAQManagement() {
 
   const fetchFAQs = async () => {
     try {
-      // Mock data - replace with actual API call
-      const mockFAQs: FAQ[] = [
-        {
-          id: '1',
-          question: 'How do I create a watch party?',
-          answer: 'To create a watch party, go to your dashboard and click on "Create Party". Choose your video, set your preferences, and invite friends by sharing the party link.',
-          category: 'parties',
-          isPublished: true,
-          order: 1,
-          tags: ['create', 'party', 'invite'],
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-10T00:00:00Z',
-          views: 1248,
-          helpful: 89,
-          notHelpful: 12
-        },
-        {
-          id: '2',
-          question: 'Can I watch parties on mobile devices?',
-          answer: 'Yes! WatchParty is fully compatible with mobile devices. You can join parties, chat with friends, and enjoy synchronized viewing on your phone or tablet.',
-          category: 'technical',
-          isPublished: true,
-          order: 2,
-          tags: ['mobile', 'compatibility', 'devices'],
-          createdAt: '2024-01-02T00:00:00Z',
-          updatedAt: '2024-01-08T00:00:00Z',
-          views: 892,
-          helpful: 67,
-          notHelpful: 8
-        },
-        {
-          id: '3',
-          question: 'How do I cancel my subscription?',
-          answer: 'You can cancel your subscription at any time by going to Settings > Billing > Cancel Subscription. Your premium features will remain active until the end of your billing period.',
-          category: 'billing',
-          isPublished: true,
-          order: 3,
-          tags: ['subscription', 'cancel', 'billing'],
-          createdAt: '2024-01-03T00:00:00Z',
-          updatedAt: '2024-01-05T00:00:00Z',
-          views: 534,
-          helpful: 45,
-          notHelpful: 3
-        },
-        {
-          id: '4',
-          question: 'What file formats are supported for video uploads?',
-          answer: 'WatchParty supports MP4, WebM, and AVI formats. For best compatibility, we recommend MP4 files with H.264 encoding. Maximum file size is 2GB for free users and 10GB for premium users.',
-          category: 'technical',
-          isPublished: false,
-          order: 4,
-          tags: ['upload', 'formats', 'video', 'limits'],
-          createdAt: '2024-01-04T00:00:00Z',
-          updatedAt: '2024-01-04T00:00:00Z',
-          views: 0,
-          helpful: 0,
-          notHelpful: 0
-        },
-        {
-          id: '5',
-          question: 'How do I reset my password?',
-          answer: 'Click on "Forgot Password" on the login page, enter your email address, and we\'ll send you a reset link. Follow the instructions in the email to create a new password.',
-          category: 'account',
-          isPublished: true,
-          order: 5,
-          tags: ['password', 'reset', 'login', 'security'],
-          createdAt: '2024-01-05T00:00:00Z',
-          updatedAt: '2024-01-06T00:00:00Z',
-          views: 723,
-          helpful: 58,
-          notHelpful: 5
-        }
-      ]
-      
-      setFaqs(mockFAQs.sort((a, b) => a.order - b.order))
+      // Fetch FAQs from supportAPI
+      const response = await supportAPI.getFAQs ? supportAPI.getFAQs() : [];
+      let faqsData = Array.isArray(response) ? response : Array.isArray(response?.faqs) ? response.faqs : [];
+      // Normalize and sort by order
+      faqsData = faqsData.map((faq: any) => ({
+        id: String(faq.id ?? faq.faq_id ?? Math.random().toString(36).substr(2, 9)),
+        question: faq.question ?? '',
+        answer: faq.answer ?? '',
+        category: faq.category ?? 'general',
+        isPublished: Boolean(faq.is_published ?? faq.published ?? true),
+        order: Number(faq.order ?? 0),
+        tags: Array.isArray(faq.tags) ? faq.tags : (faq.tags ? String(faq.tags).split(',').map((t: string) => t.trim()) : []),
+        createdAt: faq.created_at ?? '',
+        updatedAt: faq.updated_at ?? '',
+        views: Number(faq.views ?? 0),
+        helpful: Number(faq.helpful ?? 0),
+        notHelpful: Number(faq.not_helpful ?? 0)
+      }));
+      setFaqs(faqsData.sort((a, b) => a.order - b.order));
     } catch (error) {
-      console.error('Failed to fetch FAQs:', error)
+      console.error('Failed to fetch FAQs:', error);
       toast({
         title: 'Error',
         description: 'Failed to load FAQs',
         variant: 'destructive'
-      })
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 

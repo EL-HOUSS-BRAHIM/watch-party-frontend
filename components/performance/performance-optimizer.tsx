@@ -85,44 +85,7 @@ interface BundleAnalysis {
   }>
 }
 
-const mockMetrics: PerformanceMetric[] = [
-  {
-    name: "First Contentful Paint",
-    value: 1.2,
-    target: 1.8,
-    unit: "s",
-    status: "good",
-    trend: "down",
-    description: "Time until the first content is painted",
-  },
-  {
-    name: "Largest Contentful Paint",
-    value: 2.8,
-    target: 2.5,
-    unit: "s",
-    status: "needs-improvement",
-    trend: "up",
-    description: "Time until the largest content element is painted",
-  },
-  {
-    name: "Cumulative Layout Shift",
-    value: 0.15,
-    target: 0.1,
-    unit: "",
-    status: "needs-improvement",
-    trend: "stable",
-    description: "Visual stability of the page",
-  },
-  {
-    name: "Time to Interactive",
-    value: 3.2,
-    target: 3.8,
-    unit: "s",
-    status: "good",
-    trend: "down",
-    description: "Time until the page is fully interactive",
-  },
-]
+}
 
 const mockSuggestions: OptimizationSuggestion[] = [
   {
@@ -194,24 +157,190 @@ export function PerformanceOptimizer() {
   const [metrics, setMetrics] = useState<PerformanceMetric[]>([])
   const [suggestions, setSuggestions] = useState<OptimizationSuggestion[]>([])
   const [bundleAnalysis, setBundleAnalysis] = useState<BundleAnalysis | null>(null)
-  const [optimizationSettings, setOptimizationSettings] = useState({
-    imageOptimization: true,
-    codeSplitting: true,
-    treeshaking: true,
-    minification: true,
-    compression: true,
-    caching: false,
-    preloading: false,
-    lazyLoading: true,
-  })
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
+  const [historicalData, setHistoricalData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [selectedMetric, setSelectedMetric] = useState("performance")
+  const [optimizationDialogOpen, setOptimizationDialogOpen] = useState(false)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<OptimizationSuggestion | null>(null)
   const { toast } = useToast()
 
-  useEffect(() => {
-    fetchPerformanceData()
-  }, [])
+  const normalizeMetric = (metric: any): PerformanceMetric => {
+    const status = getMetricStatus(metric.value, metric.target || metric.threshold)
+    return {
+      name: metric.name ?? metric.label ?? metric.key ?? 'Performance Metric',
+      value: Number(metric.value ?? metric.current ?? 0),
+      target: Number(metric.target ?? metric.threshold ?? metric.goal ?? 0),
+      unit: metric.unit ?? metric.suffix ?? '',
+      status,
+      trend: normalizeTrend(metric.trend ?? metric.direction ?? metric.change),
+      description: metric.description ?? metric.help ?? `Performance metric: ${metric.name}`
+    }
+  }
+
+  const getMetricStatus = (value: number, target: number): PerformanceMetric['status'] => {
+    if (!target) return 'good'
+    const ratio = value / target
+    if (ratio <= 0.8) return 'good'
+    if (ratio <= 1.2) return 'needs-improvement'
+    return 'poor'
+  }
+
+  const normalizeTrend = (trend: any): PerformanceMetric['trend'] => {
+    if (typeof trend === 'string') {
+      const trendLower = trend.toLowerCase()
+      if (trendLower.includes('up') || trendLower.includes('increase')) return 'up'
+      if (trendLower.includes('down') || trendLower.includes('decrease')) return 'down'
+    }
+    if (typeof trend === 'number') {
+      if (trend > 0.05) return 'up'
+      if (trend < -0.05) return 'down'
+    }
+    return 'stable'
+  }
+
+  const normalizeSuggestion = (suggestion: any): OptimizationSuggestion => {
+    return {
+      id: String(suggestion.id ?? suggestion.suggestion_id ?? Math.random().toString(36).substr(2, 9)),
+      category: normalizeCategory(suggestion.category ?? suggestion.type),
+      title: suggestion.title ?? suggestion.name ?? suggestion.summary ?? 'Optimization Suggestion',
+      description: suggestion.description ?? suggestion.details ?? '',
+      impact: normalizeImpact(suggestion.impact ?? suggestion.priority),
+      effort: normalizeEffort(suggestion.effort ?? suggestion.difficulty),
+      implemented: Boolean(suggestion.implemented ?? suggestion.applied ?? false),
+      estimatedImprovement: suggestion.estimated_improvement ?? suggestion.benefit ?? 'Performance improvement expected'
+    }
+  }
+
+  const normalizeCategory = (category: any): OptimizationSuggestion['category'] => {
+    const categoryStr = String(category).toLowerCase()
+    if (categoryStr.includes('image') || categoryStr.includes('media')) return 'images'
+    if (categoryStr.includes('code') || categoryStr.includes('bundle') || categoryStr.includes('js')) return 'code'
+    if (categoryStr.includes('cache') || categoryStr.includes('storage')) return 'caching'
+    if (categoryStr.includes('network') || categoryStr.includes('request')) return 'network'
+    if (categoryStr.includes('database') || categoryStr.includes('query')) return 'database'
+    return 'code'
+  }
+
+  const normalizeImpact = (impact: any): OptimizationSuggestion['impact'] => {
+    const impactStr = String(impact).toLowerCase()
+    if (impactStr.includes('high') || impactStr.includes('critical')) return 'high'
+    if (impactStr.includes('low') || impactStr.includes('minor')) return 'low'
+    return 'medium'
+  }
+
+  const normalizeEffort = (effort: any): OptimizationSuggestion['effort'] => {
+    const effortStr = String(effort).toLowerCase()
+    if (effortStr.includes('high') || effortStr.includes('difficult') || effortStr.includes('hard')) return 'high'
+    if (effortStr.includes('low') || effortStr.includes('easy') || effortStr.includes('simple')) return 'low'
+    return 'medium'
+  }
+
+  const normalizeBundleAnalysis = (analysis: any): BundleAnalysis => {
+    return {
+      totalSize: Number(analysis.total_size ?? analysis.bundle_size ?? 0),
+      gzippedSize: Number(analysis.gzipped_size ?? analysis.compressed_size ?? 0),
+      chunks: Array.isArray(analysis.chunks) ? analysis.chunks.map((chunk: any) => ({
+        name: chunk.name ?? chunk.filename ?? 'Unknown Chunk',
+        size: Number(chunk.size ?? chunk.file_size ?? 0),
+        modules: Number(chunk.modules ?? chunk.module_count ?? 0)
+      })) : [],
+      duplicates: Array.isArray(analysis.duplicates) ? analysis.duplicates.map((dup: any) => ({
+        module: dup.module ?? dup.name ?? 'Unknown Module',
+        instances: Number(dup.instances ?? dup.count ?? 0),
+        totalSize: Number(dup.total_size ?? dup.size ?? 0)
+      })) : []
+    }
+  }
+
+    const fetchPerformanceData = useCallback(async () => {
+    try {
+      setLoading(true)
+      
+      const [systemPerformance, dashboardData] = await Promise.allSettled([
+        analyticsAPI.getSystemPerformance(),
+        analyticsAPI.getDashboard('performance')
+      ])
+
+      // Handle system performance metrics
+      if (systemPerformance.status === 'fulfilled' && systemPerformance.value) {
+        const perfData = systemPerformance.value
+        
+        if (Array.isArray(perfData.metrics)) {
+          setMetrics(perfData.metrics.map(normalizeMetric))
+        } else if (perfData.performance_metrics) {
+          // Handle alternative response format
+          const fallbackMetrics: PerformanceMetric[] = [
+            {
+              name: 'Response Time',
+              value: Number(perfData.avg_response_time ?? 0),
+              target: 200,
+              unit: 'ms',
+              status: getMetricStatus(perfData.avg_response_time, 200),
+              trend: normalizeTrend(perfData.response_time_trend),
+              description: 'Average server response time'
+            },
+            {
+              name: 'CPU Usage',
+              value: Number(perfData.cpu_usage ?? 0),
+              target: 70,
+              unit: '%',
+              status: getMetricStatus(perfData.cpu_usage, 70),
+              trend: normalizeTrend(perfData.cpu_trend),
+              description: 'Server CPU utilization'
+            },
+            {
+              name: 'Memory Usage',
+              value: Number(perfData.memory_usage ?? 0),
+              target: 80,
+              unit: '%',
+              status: getMetricStatus(perfData.memory_usage, 80),
+              trend: normalizeTrend(perfData.memory_trend),
+              description: 'Server memory utilization'
+            }
+          ]
+          setMetrics(fallbackMetrics)
+        }
+
+        // Handle optimization suggestions
+        if (Array.isArray(perfData.suggestions)) {
+          setSuggestions(perfData.suggestions.map(normalizeSuggestion))
+        }
+
+        // Handle bundle analysis
+        if (perfData.bundle_analysis) {
+          setBundleAnalysis(normalizeBundleAnalysis(perfData.bundle_analysis))
+        }
+
+        // Handle historical data
+        if (Array.isArray(perfData.historical_data)) {
+          setHistoricalData(perfData.historical_data.map((point: any) => ({
+            time: point.time ?? point.timestamp ?? new Date().toLocaleTimeString(),
+            performance: Number(point.performance_score ?? point.score ?? 0),
+            responseTime: Number(point.response_time ?? 0),
+            errors: Number(point.error_rate ?? point.errors ?? 0),
+            throughput: Number(point.throughput ?? point.requests ?? 0)
+          })))
+        }
+      }
+
+    } catch (error) {
+      console.error('Failed to fetch performance data:', error)
+      toast({
+        title: 'Performance Data Unavailable',
+        description: 'Unable to load performance metrics. Please try again later.',
+        variant: 'destructive'
+      })
+      
+      // Set empty state on error
+      setMetrics([])
+      setSuggestions([])
+      setBundleAnalysis(null)
+      setHistoricalData([])
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
 
   const fetchPerformanceData = async () => {
     setIsLoading(true)

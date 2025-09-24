@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
 import { Eye, Clock, TrendingUp, Users } from 'lucide-react'
+import { videosAPI } from '@/lib/api'
+import { useToast } from '@/hooks/use-toast'
 
 interface StreamAnalyticsData {
   current_viewers: number
@@ -35,6 +37,7 @@ interface StreamAnalyticsOverlayProps {
 export function StreamAnalyticsOverlay({ videoId, isLive = false, onClose }: StreamAnalyticsOverlayProps) {
   const [analytics, setAnalytics] = useState<StreamAnalyticsData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const { toast } = useToast()
 
   useEffect(() => {
     fetchAnalytics()
@@ -48,34 +51,68 @@ export function StreamAnalyticsOverlay({ videoId, isLive = false, onClose }: Str
   const fetchAnalytics = async () => {
     try {
       setIsLoading(true)
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
       
-      const mockData: StreamAnalyticsData = {
-        current_viewers: isLive ? Math.floor(Math.random() * 100) + 20 : 0,
-        peak_viewers: Math.floor(Math.random() * 500) + 100,
-        total_views: Math.floor(Math.random() * 10000) + 1000,
-        average_watch_time: Math.floor(Math.random() * 300) + 120,
-        watch_time_data: Array.from({ length: 24 }, (_, i) => ({
-          time: `${i}:00`,
-          viewers: Math.floor(Math.random() * 100) + 10,
-          retention: Math.floor(Math.random() * 40) + 60
-        })),
-        retention_curve: Array.from({ length: 100 }, (_, i) => ({
-          timestamp: i,
-          percentage: Math.max(10, 100 - (i * 0.8) - Math.random() * 20)
-        })),
-        viewer_locations: [
-          { country: 'United States', viewers: 45 },
-          { country: 'United Kingdom', viewers: 23 },
-          { country: 'Canada', viewers: 18 },
-          { country: 'Australia', viewers: 14 }
-        ]
+      // Fetch video analytics from the API
+      const response = await videosAPI.getVideoAnalytics(videoId)
+      
+      if (response) {
+        const normalizedData: StreamAnalyticsData = {
+          current_viewers: isLive ? (response.current_viewers ?? 0) : 0,
+          peak_viewers: response.peak_viewers ?? 0,
+          total_views: response.total_views ?? 0,
+          average_watch_time: response.average_watch_time ?? 0,
+          watch_time_data: Array.isArray(response.hourly_stats) 
+            ? response.hourly_stats.map((stat: any) => ({
+                time: stat.hour ?? stat.time ?? '0:00',
+                viewers: stat.viewers ?? stat.view_count ?? 0,
+                retention: stat.retention_percentage ?? stat.retention ?? 0
+              }))
+            : [],
+          retention_curve: Array.isArray(response.retention_data)
+            ? response.retention_data.map((point: any) => ({
+                timestamp: point.timestamp ?? point.time ?? 0,
+                percentage: point.percentage ?? point.retention ?? 0
+              }))
+            : [],
+          viewer_locations: Array.isArray(response.geographic_data)
+            ? response.geographic_data.map((geo: any) => ({
+                country: geo.country ?? geo.location ?? 'Unknown',
+                viewers: geo.viewers ?? geo.view_count ?? 0
+              }))
+            : []
+        }
+        
+        setAnalytics(normalizedData)
+      } else {
+        // Fallback to empty data if no response
+        setAnalytics({
+          current_viewers: 0,
+          peak_viewers: 0,
+          total_views: 0,
+          average_watch_time: 0,
+          watch_time_data: [],
+          retention_curve: [],
+          viewer_locations: []
+        })
       }
-      
-      setAnalytics(mockData)
     } catch (error) {
-      console.error('Failed to fetch analytics:', error)
+      console.error('Failed to fetch video analytics:', error)
+      toast({
+        title: 'Analytics Unavailable',
+        description: 'Unable to load video analytics. Please try again later.',
+        variant: 'destructive'
+      })
+      
+      // Set empty analytics on error to allow UI to render
+      setAnalytics({
+        current_viewers: 0,
+        peak_viewers: 0,
+        total_views: 0,
+        average_watch_time: 0,
+        watch_time_data: [],
+        retention_curve: [],
+        viewer_locations: []
+      })
     } finally {
       setIsLoading(false)
     }

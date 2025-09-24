@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { MessageSquare, Users, AlertCircle, TrendingUp, Calendar } from 'lucide-react';
+import { chatAPI } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatStats {
   totalMessages: number;
@@ -46,6 +48,35 @@ export default function ChatStatsPage() {
   const [selectedChannel, setSelectedChannel] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const normalizeChannelData = (channel: any) => {
+    return {
+      id: String(channel.id ?? channel.channel_id ?? Math.random().toString(36).substr(2, 9)),
+      name: channel.name ?? channel.channel_name ?? channel.title ?? `Channel ${channel.id}`,
+      messageCount: Number(channel.message_count ?? channel.messages ?? channel.total_messages ?? 0),
+      userCount: Number(channel.user_count ?? channel.users ?? channel.participants ?? 0)
+    }
+  }
+
+  const normalizeActivity = (activity: any) => {
+    return {
+      id: String(activity.id ?? Math.random().toString(36).substr(2, 9)),
+      type: normalizeActivityType(activity.type ?? activity.activity_type),
+      user: activity.user ?? activity.username ?? activity.user_name ?? 'Unknown',
+      channel: activity.channel ?? activity.channel_name ?? activity.room ?? 'Unknown',
+      timestamp: activity.timestamp ?? activity.created_at ?? activity.time ?? 'Unknown',
+      details: activity.details ?? activity.description ?? activity.message ?? undefined
+    }
+  }
+
+  const normalizeActivityType = (type: any): 'message' | 'join' | 'leave' | 'moderation' => {
+    const typeStr = String(type).toLowerCase()
+    if (typeStr.includes('moderation') || typeStr.includes('mod') || typeStr.includes('ban') || typeStr.includes('warn')) return 'moderation'
+    if (typeStr.includes('join') || typeStr.includes('enter')) return 'join'
+    if (typeStr.includes('leave') || typeStr.includes('exit')) return 'leave'
+    return 'message'
+  }
 
   useEffect(() => {
     fetchChatStats();
@@ -54,43 +85,107 @@ export default function ChatStatsPage() {
   const fetchChatStats = async () => {
     setLoading(true);
     try {
-      // Mock data - replace with actual API call
-      const mockStats: ChatStats = {
-        totalMessages: 15420,
-        totalUsers: 1250,
-        activeUsers: 340,
-        averageMessagesPerUser: 12.3,
-        topChannels: [
-          { id: '1', name: 'General Chat', messageCount: 8520, userCount: 890 },
-          { id: '2', name: 'Movie Discussion', messageCount: 4200, userCount: 560 },
-          { id: '3', name: 'Party Room #1', messageCount: 2100, userCount: 340 },
-          { id: '4', name: 'Help & Support', messageCount: 600, userCount: 180 },
-        ],
-        messagesByHour: Array.from({ length: 24 }, (_, i) => ({
-          hour: i,
-          count: Math.floor(Math.random() * 1000) + 200
-        })),
-        moderationActions: [
-          { type: 'Messages Deleted', count: 45, color: '#ef4444' },
-          { type: 'Users Warned', count: 23, color: '#f59e0b' },
-          { type: 'Users Muted', count: 12, color: '#8b5cf6' },
-          { type: 'Users Banned', count: 3, color: '#dc2626' },
-        ],
-        recentActivity: [
-          { id: '1', type: 'moderation', user: 'admin', channel: 'General Chat', timestamp: '2 minutes ago', details: 'Deleted spam message' },
-          { id: '2', type: 'message', user: 'user123', channel: 'Movie Discussion', timestamp: '5 minutes ago' },
-          { id: '3', type: 'join', user: 'newuser', channel: 'Party Room #1', timestamp: '8 minutes ago' },
-          { id: '4', type: 'moderation', user: 'moderator2', channel: 'General Chat', timestamp: '12 minutes ago', details: 'Warning issued for inappropriate content' },
-        ]
-      };
+      // Fetch chat statistics from multiple API endpoints
+      const [messagesResponse, usersResponse, moderationResponse] = await Promise.allSettled([
+        chatAPI.getPartyMessages({ timeframe, channel: selectedChannel !== 'all' ? selectedChannel : undefined }),
+        chatAPI.getActiveUsers({ timeframe }),
+        chatAPI.getModerationStats ? chatAPI.getModerationStats({ timeframe }) : Promise.resolve(null)
+      ])
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setStats(mockStats);
+      let chatStats: ChatStats = {
+        totalMessages: 0,
+        totalUsers: 0,
+        activeUsers: 0,
+        averageMessagesPerUser: 0,
+        topChannels: [],
+        messagesByHour: [],
+        moderationActions: [],
+        recentActivity: []
+      }
+
+      // Process messages data
+      if (messagesResponse.status === 'fulfilled' && messagesResponse.value) {
+        const messagesData = messagesResponse.value
+        chatStats.totalMessages = Number(messagesData.total_count ?? messagesData.total_messages ?? 0)
+        
+        // Process hourly message data
+        if (Array.isArray(messagesData.hourly_stats)) {
+          chatStats.messagesByHour = messagesData.hourly_stats.map((stat: any) => ({
+            hour: Number(stat.hour ?? stat.time ?? 0),
+            count: Number(stat.count ?? stat.messages ?? 0)
+          }))
+        } else {
+          // Generate empty hourly data if not available
+          chatStats.messagesByHour = Array.from({ length: 24 }, (_, i) => ({
+            hour: i,
+            count: 0
+          }))
+        }
+
+        // Process channel data
+        if (Array.isArray(messagesData.channels) || Array.isArray(messagesData.top_channels)) {
+          const channels = messagesData.channels || messagesData.top_channels || []
+          chatStats.topChannels = channels.map(normalizeChannelData).slice(0, 10)
+        }
+
+        // Process recent activity
+        if (Array.isArray(messagesData.recent_activity)) {
+          chatStats.recentActivity = messagesData.recent_activity.map(normalizeActivity).slice(0, 20)
+        }
+      }
+
+      // Process users data
+      if (usersResponse.status === 'fulfilled' && usersResponse.value) {
+        const usersData = usersResponse.value
+        chatStats.totalUsers = Number(usersData.total_users ?? usersData.total ?? 0)
+        chatStats.activeUsers = Number(usersData.active_users ?? usersData.active ?? 0)
+        
+        if (chatStats.totalMessages > 0 && chatStats.totalUsers > 0) {
+          chatStats.averageMessagesPerUser = Number((chatStats.totalMessages / chatStats.totalUsers).toFixed(1))
+        }
+      }
+
+      // Process moderation data
+      if (moderationResponse.status === 'fulfilled' && moderationResponse.value) {
+        const moderationData = moderationResponse.value
+        if (Array.isArray(moderationData.actions)) {
+          chatStats.moderationActions = moderationData.actions.map((action: any) => ({
+            type: action.type ?? action.action_type ?? 'Unknown',
+            count: Number(action.count ?? action.total ?? 0),
+            color: getActionColor(action.type)
+          }))
+        } else if (moderationData.deleted_messages || moderationData.warnings || moderationData.bans) {
+          // Fallback for different response format
+          chatStats.moderationActions = [
+            { type: 'Messages Deleted', count: Number(moderationData.deleted_messages ?? 0), color: '#ef4444' },
+            { type: 'Users Warned', count: Number(moderationData.warnings ?? moderationData.warns ?? 0), color: '#f59e0b' },
+            { type: 'Users Muted', count: Number(moderationData.mutes ?? moderationData.muted ?? 0), color: '#8b5cf6' },
+            { type: 'Users Banned', count: Number(moderationData.bans ?? moderationData.banned ?? 0), color: '#dc2626' },
+          ].filter(action => action.count > 0)
+        }
+      }
+
+      setStats(chatStats);
     } catch (error) {
       console.error('Failed to fetch chat stats:', error);
+      toast({
+        title: 'Chat Statistics Unavailable',
+        description: 'Unable to load chat statistics. Please try again later.',
+        variant: 'destructive'
+      })
+      setStats(null)
     } finally {
       setLoading(false);
     }
+  }
+
+  const getActionColor = (actionType: string): string => {
+    const type = String(actionType).toLowerCase()
+    if (type.includes('delete') || type.includes('remove')) return '#ef4444'
+    if (type.includes('warn') || type.includes('warning')) return '#f59e0b'
+    if (type.includes('mute') || type.includes('silence')) return '#8b5cf6'
+    if (type.includes('ban') || type.includes('block')) return '#dc2626'
+    return '#6b7280'
   };
 
   if (loading) {

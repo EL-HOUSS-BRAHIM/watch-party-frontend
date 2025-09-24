@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Badge } from   const filteredJobs = jobs.filter((job) => filterStatus === \"all\" || job.status === filterStatus)\n\n  if (loading) {\n    return (\n      <div className=\"space-y-6\">\n        <div className=\"flex items-center justify-center p-8\">\n          <div className=\"animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600\"></div>\n          <span className=\"ml-2 text-gray-600\">Loading processing jobs...</span>\n        </div>\n      </div>\n    )\n  }@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -35,6 +35,8 @@ import {
   Eye,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { videosAPI } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
 
 interface ProcessingJob {
   id: string
@@ -89,68 +91,7 @@ interface ProcessingSettings {
   outputFormats: string[]
 }
 
-const mockJobs: ProcessingJob[] = [
-  {
-    id: "1",
-    filename: "movie-night-2024.mp4",
-    originalSize: 2147483648, // 2GB
-    status: "processing",
-    progress: 65,
-    startedAt: "2024-01-28T10:00:00Z",
-    tasks: [
-      { id: "1", name: "Video Analysis", status: "completed", progress: 100 },
-      { id: "2", name: "Transcoding (1080p)", status: "running", progress: 65, estimatedTime: 300 },
-      { id: "3", name: "Transcoding (720p)", status: "pending", progress: 0 },
-      { id: "4", name: "Thumbnail Generation", status: "pending", progress: 0 },
-      { id: "5", name: "Preview Creation", status: "pending", progress: 0 },
-    ],
-    outputFiles: [],
-    metadata: {
-      duration: 7200,
-      resolution: "1920x1080",
-      bitrate: 5000000,
-      codec: "H.264",
-      fps: 24,
-      aspectRatio: "16:9",
-      audioCodec: "AAC",
-      audioChannels: 2,
-    },
-  },
-  {
-    id: "2",
-    filename: "documentary-series-ep1.mov",
-    originalSize: 1073741824, // 1GB
-    status: "completed",
-    progress: 100,
-    startedAt: "2024-01-28T09:00:00Z",
-    completedAt: "2024-01-28T09:45:00Z",
-    duration: 2700,
-    tasks: [
-      { id: "1", name: "Video Analysis", status: "completed", progress: 100 },
-      { id: "2", name: "Transcoding (1080p)", status: "completed", progress: 100 },
-      { id: "3", name: "Transcoding (720p)", status: "completed", progress: 100 },
-      { id: "4", name: "Thumbnail Generation", status: "completed", progress: 100 },
-      { id: "5", name: "Preview Creation", status: "completed", progress: 100 },
-    ],
-    outputFiles: [
-      { id: "1", type: "video", quality: "1080p", format: "mp4", size: 800000000, url: "/videos/doc-1080p.mp4" },
-      { id: "2", type: "video", quality: "720p", format: "mp4", size: 500000000, url: "/videos/doc-720p.mp4" },
-      { id: "3", type: "thumbnail", format: "jpg", size: 150000, url: "/thumbnails/doc-thumb.jpg" },
-      { id: "4", type: "preview", format: "mp4", size: 50000000, url: "/previews/doc-preview.mp4" },
-      { id: "5", type: "subtitle", format: "vtt", size: 25000, url: "/subtitles/doc-en.vtt" },
-    ],
-    metadata: {
-      duration: 3600,
-      resolution: "1920x1080",
-      bitrate: 4000000,
-      codec: "H.264",
-      fps: 30,
-      aspectRatio: "16:9",
-      audioCodec: "AAC",
-      audioChannels: 2,
-    },
-  },
-]
+}
 
 const mockSettings: ProcessingSettings = {
   videoQualities: ["1080p", "720p", "480p"],
@@ -163,12 +104,156 @@ const mockSettings: ProcessingSettings = {
 }
 
 export function VideoProcessingPipeline() {
-  const [jobs, setJobs] = useState<ProcessingJob[]>(mockJobs)
-  const [settings, setSettings] = useState<ProcessingSettings>(mockSettings)
+  const [jobs, setJobs] = useState<ProcessingJob[]>([])
+  const [settings, setSettings] = useState<ProcessingSettings>({
+    videoQualities: ["1080p", "720p", "480p"],
+    thumbnailCount: 5,
+    previewDuration: 30,
+    enableSubtitles: true,
+    enableMetadataExtraction: true,
+    enableContentAnalysis: true,
+    outputFormats: ["mp4", "webm"],
+  })
   const [selectedJob, setSelectedJob] = useState<ProcessingJob | null>(null)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
+
+  const normalizeProcessingJob = (job: any): ProcessingJob => {
+    return {
+      id: String(job.id ?? job.job_id ?? Math.random().toString(36).substr(2, 9)),
+      filename: job.filename ?? job.original_filename ?? job.name ?? "Unknown File",
+      originalSize: job.original_size ?? job.file_size ?? 0,
+      status: normalizeStatus(job.status ?? job.state),
+      progress: Math.max(0, Math.min(100, job.progress ?? job.completion_percentage ?? 0)),
+      startedAt: job.started_at ?? job.created_at ?? new Date().toISOString(),
+      completedAt: job.completed_at ?? job.finished_at ?? undefined,
+      duration: job.duration ?? job.processing_duration ?? undefined,
+      tasks: Array.isArray(job.tasks) ? job.tasks.map(normalizeTask) : [],
+      outputFiles: Array.isArray(job.output_files) ? job.output_files.map(normalizeOutputFile) : [],
+      metadata: normalizeMetadata(job.metadata ?? job.video_metadata ?? {})
+    }
+  }
+
+  const normalizeStatus = (status: string): ProcessingJob['status'] => {
+    const statusMap: Record<string, ProcessingJob['status']> = {
+      'pending': 'queued',
+      'queued': 'queued',
+      'running': 'processing',
+      'processing': 'processing',
+      'in_progress': 'processing',
+      'completed': 'completed',
+      'finished': 'completed',
+      'success': 'completed',
+      'failed': 'failed',
+      'error': 'failed',
+      'cancelled': 'cancelled',
+      'canceled': 'cancelled'
+    }
+    return statusMap[status?.toLowerCase()] ?? 'queued'
+  }
+
+  const normalizeTask = (task: any): ProcessingTask => {
+    return {
+      id: String(task.id ?? task.task_id ?? Math.random().toString(36).substr(2, 9)),
+      name: task.name ?? task.task_name ?? task.type ?? "Processing Task",
+      status: normalizeTaskStatus(task.status ?? task.state),
+      progress: Math.max(0, Math.min(100, task.progress ?? 0)),
+      estimatedTime: task.estimated_time ?? task.eta ?? undefined,
+      error: task.error ?? task.error_message ?? undefined
+    }
+  }
+
+  const normalizeTaskStatus = (status: string): ProcessingTask['status'] => {
+    const statusMap: Record<string, ProcessingTask['status']> = {
+      'pending': 'pending',
+      'waiting': 'pending',
+      'running': 'running',
+      'processing': 'running',
+      'in_progress': 'running',
+      'completed': 'completed',
+      'finished': 'completed',
+      'success': 'completed',
+      'failed': 'failed',
+      'error': 'failed'
+    }
+    return statusMap[status?.toLowerCase()] ?? 'pending'
+  }
+
+  const normalizeOutputFile = (file: any): OutputFile => {
+    return {
+      id: String(file.id ?? file.file_id ?? Math.random().toString(36).substr(2, 9)),
+      type: normalizeFileType(file.type ?? file.file_type),
+      quality: file.quality ?? file.resolution ?? undefined,
+      format: file.format ?? file.extension ?? file.file_extension ?? "mp4",
+      size: file.size ?? file.file_size ?? 0,
+      url: file.url ?? file.download_url ?? file.path ?? ""
+    }
+  }
+
+  const normalizeFileType = (type: string): OutputFile['type'] => {
+    const typeMap: Record<string, OutputFile['type']> = {
+      'video': 'video',
+      'thumbnail': 'thumbnail',
+      'thumb': 'thumbnail',
+      'preview': 'preview',
+      'subtitle': 'subtitle',
+      'subtitles': 'subtitle',
+      'srt': 'subtitle',
+      'vtt': 'subtitle',
+      'metadata': 'metadata',
+      'meta': 'metadata'
+    }
+    return typeMap[type?.toLowerCase()] ?? 'video'
+  }
+
+  const normalizeMetadata = (metadata: any): VideoMetadata => {
+    return {
+      duration: metadata.duration ?? 0,
+      resolution: metadata.resolution ?? metadata.dimensions ?? "Unknown",
+      bitrate: metadata.bitrate ?? metadata.bit_rate ?? 0,
+      codec: metadata.codec ?? metadata.video_codec ?? "Unknown",
+      fps: metadata.fps ?? metadata.frame_rate ?? 0,
+      aspectRatio: metadata.aspect_ratio ?? metadata.ratio ?? "Unknown",
+      audioCodec: metadata.audio_codec ?? metadata.audio ?? "Unknown",
+      audioChannels: metadata.audio_channels ?? metadata.channels ?? 0
+    }
+  }
+
+  const fetchProcessingJobs = useCallback(async () => {
+    setLoading(true)
+    try {
+      const response = await videosAPI.getProcessingJobs()
+      const jobsData = Array.isArray(response) ? response : Array.isArray(response?.jobs) ? response.jobs : []
+      setJobs(jobsData.map(normalizeProcessingJob))
+    } catch (error) {
+      console.error('Failed to fetch processing jobs:', error)
+      toast({
+        title: 'Processing Jobs Unavailable',
+        description: 'Unable to load video processing jobs. Please try again later.',
+        variant: 'destructive'
+      })
+      setJobs([])
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
+
+  useEffect(() => {
+    fetchProcessingJobs()
+    
+    // Set up polling for active jobs
+    const interval = setInterval(() => {
+      const hasActiveJobs = jobs.some(job => job.status === 'processing' || job.status === 'queued')
+      if (hasActiveJobs) {
+        fetchProcessingJobs()
+      }
+    }, 10000) // Poll every 10 seconds
+
+    return () => clearInterval(interval)
+  }, [fetchProcessingJobs, jobs])
 
   const filteredJobs = jobs.filter((job) => filterStatus === "all" || job.status === filterStatus)
 
