@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,11 +25,13 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import QRCode from "qrcode"
+import { AuthAPI } from "@/lib/api/auth"
 
 export default function TwoFactorSetupPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { toast } = useToast()
+  const authService = useMemo(() => new AuthAPI(), [])
 
   const [step, setStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
@@ -58,33 +60,33 @@ export default function TwoFactorSetupPage() {
   const generateQRCode = async () => {
     setIsGeneratingQR(true)
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await fetch("/api/auth/2fa/setup/", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      const data = await authService.setup2FA()
+
+      if (!data?.secret) {
+        throw new Error("Missing secret in setup response")
+      }
+
+      setSecretKey(data.secret)
+      if (Array.isArray(data.backup_codes)) {
+        setBackupCodes(data.backup_codes)
+      }
+
+      if (data.qr_code) {
+        setQrCodeUrl(data.qr_code)
+        return
+      }
+
+      // Generate QR code locally when backend doesn't supply a ready image
+      const qrData = `otpauth://totp/WatchParty:${user?.email ?? ""}?secret=${data.secret}&issuer=WatchParty`
+      const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: "#000000",
+          light: "#FFFFFF",
         },
       })
-
-      if (response.ok) {
-        const data = await response.json()
-        setSecretKey(data.secret)
-
-        // Generate QR code
-        const qrData = `otpauth://totp/WatchParty:${user?.email}?secret=${data.secret}&issuer=WatchParty`
-        const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
-          width: 256,
-          margin: 2,
-          color: {
-            dark: "#000000",
-            light: "#FFFFFF",
-          },
-        })
-        setQrCodeUrl(qrCodeDataUrl)
-      } else {
-        throw new Error("Failed to generate 2FA setup")
-      }
+      setQrCodeUrl(qrCodeDataUrl)
     } catch (error) {
       console.error("2FA setup error:", error)
       toast({
@@ -124,34 +126,28 @@ export default function TwoFactorSetupPage() {
     setErrors({})
 
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await fetch("/api/auth/2fa/verify-setup/", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          code: verificationCode,
-          secret: secretKey,
-        }),
+      const response = await authService.verify2FA(verificationCode, {
+        context: "setup",
       })
 
-      const data = await response.json()
-
-      if (response.ok) {
-        setBackupCodes(data.backupCodes)
-        setStep(3)
-        toast({
-          title: "2FA Enabled!",
-          description: "Two-factor authentication has been successfully enabled.",
-        })
-      } else {
-        setErrors({ code: data.message || "Invalid verification code" })
+      if (!response?.success) {
+        setErrors({ code: response?.message || "Invalid verification code" })
+        return
       }
-    } catch (error) {
+
+      if (Array.isArray(response.backup_codes) && response.backup_codes.length > 0) {
+        setBackupCodes(response.backup_codes)
+      }
+
+      setStep(3)
+      toast({
+        title: "2FA Enabled!",
+        description: "Two-factor authentication has been successfully enabled.",
+      })
+    } catch (error: any) {
       console.error("2FA verification error:", error)
-      setErrors({ code: "Verification failed. Please try again." })
+      const message = error?.response?.data?.message || error?.message || "Verification failed. Please try again."
+      setErrors({ code: message })
     } finally {
       setIsLoading(false)
     }

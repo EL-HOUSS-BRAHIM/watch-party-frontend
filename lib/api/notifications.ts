@@ -37,7 +37,7 @@ export class NotificationsAPI {
    * Mark all notifications as read
    */
   async markAllAsRead(): Promise<APIResponse> {
-    return apiClient.post<APIResponse>('/api/notifications/mark-all-read/')
+    return apiClient.post<APIResponse>(API_ENDPOINTS.notifications.markAllRead)
   }
 
   /**
@@ -51,7 +51,11 @@ export class NotificationsAPI {
    * Bulk delete notifications
    */
   async bulkDelete(notificationIds: string[]): Promise<APIResponse> {
-    return apiClient.post<APIResponse>('/api/notifications/bulk-delete/', { notification_ids: notificationIds })
+    await Promise.all(notificationIds.map(id => this.deleteNotification(id)))
+    return {
+      success: true,
+      message: "Notifications deleted",
+    }
   }
 
   /**

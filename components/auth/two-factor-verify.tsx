@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { Shield, AlertCircle, ArrowLeft } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useApi } from "@/hooks/use-api"
+import { authAPI } from "@/lib/api"
 
 export function TwoFactorVerify() {
   const [code, setCode] = useState("")
@@ -23,7 +23,6 @@ export function TwoFactorVerify() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
-  const api = useApi()
 
   const redirectUrl = searchParams.get("redirect") || "/dashboard"
   const context = searchParams.get("context") || "login" // login, sensitive_action, etc.
@@ -40,11 +39,23 @@ export function TwoFactorVerify() {
     setError("")
 
     try {
-      const response = await api.post("/auth/2fa/verify/", {
-        code: verificationCode,
+      const response = await authAPI.verify2FA(verificationCode, {
         is_backup_code: useBackupCode,
-        context
+        context: context || undefined,
       })
+
+      if (!response?.success) {
+        throw new Error(response?.message || "Invalid verification code")
+      }
+
+      if (response.access_token) {
+        localStorage.setItem("access_token", response.access_token)
+        localStorage.setItem("accessToken", response.access_token)
+      }
+      if (response.refresh_token) {
+        localStorage.setItem("refresh_token", response.refresh_token)
+        localStorage.setItem("refreshToken", response.refresh_token)
+      }
 
       toast({
         title: "Verification successful!",
@@ -54,13 +65,14 @@ export function TwoFactorVerify() {
       // Redirect to the intended page
       router.push(redirectUrl)
     } catch (err: any) {
-      const errorData = err.response?.data
-      setError(errorData?.message || "Invalid verification code")
-      
-      if (errorData?.attempts_left !== undefined) {
+      const errorData = err?.response?.data
+      const message = errorData?.message || err?.message || "Invalid verification code"
+      setError(message)
+
+      if (typeof errorData?.attempts_left === "number") {
         setAttemptsLeft(errorData.attempts_left)
       }
-      
+
       if (errorData?.account_locked) {
         setError("Account temporarily locked due to too many failed attempts")
       }
@@ -75,20 +87,11 @@ export function TwoFactorVerify() {
     }
   }
 
-  const resendCode = async () => {
-    try {
-      await api.post("/auth/2fa/resend/")
-      toast({
-        title: "Code sent",
-        description: "A new verification code has been sent to your authenticator app",
-      })
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to resend code",
-        variant: "destructive"
-      })
-    }
+  const resendCode = () => {
+    toast({
+      title: "Need a new code?",
+      description: "Open your authenticator app to view the latest verification code.",
+    })
   }
 
   return (

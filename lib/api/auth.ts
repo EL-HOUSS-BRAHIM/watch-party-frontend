@@ -14,6 +14,8 @@ import type {
   ChangePasswordRequest,
   User,
   APIResponse,
+  TwoFactorSetupResponse,
+  TwoFactorVerifyResponse,
 } from "./types"
 
 export class AuthAPI {
@@ -36,7 +38,10 @@ export class AuthAPI {
    */
   async logout(): Promise<APIResponse> {
     // Only access localStorage on client side
-    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem("refresh_token") : null
+    const refreshToken =
+      typeof window !== 'undefined'
+        ? localStorage.getItem("refresh_token") ?? localStorage.getItem("refreshToken")
+        : null
     return apiClient.post<APIResponse>(API_ENDPOINTS.auth.logout, {
       refresh_token: refreshToken,
     })
@@ -51,7 +56,8 @@ export class AuthAPI {
       throw new Error("Cannot refresh token on server side")
     }
 
-    const refreshToken = localStorage.getItem("refresh_token")
+    const refreshToken =
+      localStorage.getItem("refresh_token") ?? localStorage.getItem("refreshToken")
     if (!refreshToken) {
       throw new Error("No refresh token available")
     }
@@ -99,20 +105,27 @@ export class AuthAPI {
   /**
    * Setup two-factor authentication
    */
-  async setup2FA(): Promise<{
-    success: boolean
-    qr_code: string
-    secret: string
-    backup_codes: string[]
-  }> {
-    return apiClient.post(API_ENDPOINTS.auth.twoFactorSetup)
+  async setup2FA(): Promise<TwoFactorSetupResponse> {
+    return apiClient.post<TwoFactorSetupResponse>(API_ENDPOINTS.auth.twoFactorSetup)
   }
 
   /**
    * Verify two-factor authentication code
    */
-  async verify2FA(code: string): Promise<AuthResponse> {
-    return apiClient.post<AuthResponse>(API_ENDPOINTS.auth.twoFactorVerify, { code })
+  async verify2FA(
+    code: string,
+    options?: {
+      is_backup_code?: boolean
+      context?: string
+      temp_token?: string
+      email?: string
+    },
+  ): Promise<TwoFactorVerifyResponse> {
+    return apiClient.post<TwoFactorVerifyResponse>(API_ENDPOINTS.auth.twoFactorVerify, {
+      token: code,
+      code,
+      ...options,
+    })
   }
 
   /**
@@ -125,8 +138,10 @@ export class AuthAPI {
   /**
    * Disable two-factor authentication
    */
-  async disable2FA(): Promise<APIResponse> {
-    return apiClient.post<APIResponse>(API_ENDPOINTS.auth.twoFactorDisable)
+  async disable2FA(password?: string): Promise<APIResponse> {
+    return apiClient.delete<APIResponse>(API_ENDPOINTS.auth.twoFactorDisable, {
+      data: password ? { password } : undefined,
+    })
   }
 
   /**
@@ -147,6 +162,13 @@ export class AuthAPI {
    */
   async deleteSession(sessionId: string): Promise<APIResponse> {
     return apiClient.delete<APIResponse>(API_ENDPOINTS.auth.sessionDelete(sessionId))
+  }
+
+  /**
+   * Revoke all other sessions
+   */
+  async revokeAllSessions(): Promise<APIResponse> {
+    return apiClient.delete<APIResponse>(API_ENDPOINTS.users.revokeAllSessions)
   }
 
   /**
@@ -176,10 +198,10 @@ export class AuthAPI {
   /**
    * Complete social authentication
    */
-  async completeSocialAuth(provider: 'google' | 'github', code: string, state?: string): Promise<AuthResponse> {
+  async completeSocialAuth(provider: string, code: string, state?: string): Promise<AuthResponse> {
     const redirectUri = `${window.location.origin}/callback?provider=${provider}`
-    
-    return apiClient.post<AuthResponse>(`/api/auth/social/${provider}/`, {
+
+    return apiClient.post<AuthResponse>(API_ENDPOINTS.auth.socialAuth(provider), {
       code,
       state,
       redirect_uri: redirectUri,

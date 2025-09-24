@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/collapsible"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatDistanceToNow, isToday, isYesterday, format } from "date-fns"
+import { notificationsAPI } from "@/lib/api"
 
 interface Notification {
   id: string
@@ -91,17 +92,37 @@ export default function NotificationGrouping({ className }: NotificationGrouping
 
   const loadNotifications = async () => {
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await fetch("/api/users/notifications/", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const data = await notificationsAPI.getNotifications()
+      const items = Array.isArray((data as any)?.results)
+        ? (data as any).results
+        : Array.isArray((data as any)?.notifications)
+          ? (data as any).notifications
+          : []
 
-      if (response.ok) {
-        const data = await response.json()
-        setNotifications(data.notifications || [])
-      }
+      const mapped = items.map((item: any) => ({
+        id: item.id,
+        type: item.type || "system",
+        title: item.title || item.message || "Notification",
+        message: item.message || item.body || "",
+        createdAt: item.created_at || item.createdAt || new Date().toISOString(),
+        readAt: item.read_at || item.readAt || (item.is_read ? item.updated_at || new Date().toISOString() : undefined),
+        actionUrl: item.action_url || item.actionUrl,
+        actionData: item.action_data || item.actionData,
+        priority: (item.priority || "normal") as Notification["priority"],
+        sender: item.sender
+          ? {
+              id: item.sender.id,
+              username: item.sender.username,
+              firstName: item.sender.first_name || item.sender.firstName || "",
+              lastName: item.sender.last_name || item.sender.lastName || "",
+              avatar: item.sender.avatar,
+            }
+          : undefined,
+        groupKey: item.group_key,
+        groupCount: item.group_count,
+      }))
+
+      setNotifications(mapped)
     } catch (error) {
       console.error("Failed to load notifications:", error)
       toast({
@@ -202,29 +223,18 @@ export default function NotificationGrouping({ className }: NotificationGrouping
 
   const markAsRead = async (notificationIds: string[]) => {
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await fetch("/api/users/notifications/mark-read/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ notification_ids: notificationIds }),
-      })
-
-      if (response.ok) {
-        setNotifications(prev => 
-          prev.map(n => 
-            notificationIds.includes(n.id) 
-              ? { ...n, readAt: new Date().toISOString() }
-              : n
-          )
+      await Promise.all(notificationIds.map(id => notificationsAPI.markAsRead(id)))
+      setNotifications(prev =>
+        prev.map(n =>
+          notificationIds.includes(n.id)
+            ? { ...n, readAt: new Date().toISOString() }
+            : n
         )
-        toast({
-          title: "Marked as read",
-          description: `${notificationIds.length} notification(s) marked as read`,
-        })
-      }
+      )
+      toast({
+        title: "Marked as read",
+        description: `${notificationIds.length} notification(s) marked as read`,
+      })
     } catch (error) {
       console.error("Failed to mark as read:", error)
       toast({
@@ -237,29 +247,17 @@ export default function NotificationGrouping({ className }: NotificationGrouping
 
   const markAsUnread = async (notificationIds: string[]) => {
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await fetch("/api/users/notifications/mark-unread/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ notification_ids: notificationIds }),
-      })
-
-      if (response.ok) {
-        setNotifications(prev => 
-          prev.map(n => 
-            notificationIds.includes(n.id) 
-              ? { ...n, readAt: undefined }
-              : n
-          )
+      setNotifications(prev =>
+        prev.map(n =>
+          notificationIds.includes(n.id)
+            ? { ...n, readAt: undefined }
+            : n
         )
-        toast({
-          title: "Marked as unread",
-          description: `${notificationIds.length} notification(s) marked as unread`,
-        })
-      }
+      )
+      toast({
+        title: "Marked locally",
+        description: "Notifications marked as unread locally. Backend does not support this action yet.",
+      })
     } catch (error) {
       console.error("Failed to mark as unread:", error)
       toast({
@@ -272,24 +270,13 @@ export default function NotificationGrouping({ className }: NotificationGrouping
 
   const deleteNotifications = async (notificationIds: string[]) => {
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await fetch("/api/users/notifications/delete/", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ notification_ids: notificationIds }),
+      await Promise.all(notificationIds.map(id => notificationsAPI.deleteNotification(id)))
+      setNotifications(prev => prev.filter(n => !notificationIds.includes(n.id)))
+      setSelectedNotifications(new Set())
+      toast({
+        title: "Notifications deleted",
+        description: `${notificationIds.length} notification(s) deleted`,
       })
-
-      if (response.ok) {
-        setNotifications(prev => prev.filter(n => !notificationIds.includes(n.id)))
-        setSelectedNotifications(new Set())
-        toast({
-          title: "Notifications deleted",
-          description: `${notificationIds.length} notification(s) deleted`,
-        })
-      }
     } catch (error) {
       console.error("Failed to delete notifications:", error)
       toast({

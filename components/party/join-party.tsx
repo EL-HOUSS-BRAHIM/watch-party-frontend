@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Users, Loader2, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useApi } from "@/hooks/use-api"
+import { partiesAPI } from "@/lib/api"
 
 export function JoinParty() {
   const [partyCode, setPartyCode] = useState("")
@@ -19,8 +19,6 @@ export function JoinParty() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
-  const api = useApi()
-
   // Check if there's a code in the URL
   const urlCode = searchParams.get("code")
   
@@ -40,20 +38,26 @@ export function JoinParty() {
     setError("")
 
     try {
-      const response = await api.post("/parties/join/", {
-        code: partyCode.trim().toUpperCase()
-      })
+      const response = await partiesAPI.joinByCode(partyCode.trim().toUpperCase())
+      const partyId = response.party?.id
 
-      const partyId = response.data.party_id
+      if (!partyId) {
+        throw new Error("The server response did not include a party identifier")
+      }
       toast({
         title: "Joined party!",
         description: "Welcome to the watch party",
       })
 
-      router.push(`/watch/${partyId}`)
+      if (response.redirect_url) {
+        window.location.href = response.redirect_url
+      } else {
+        router.push(`/watch/${partyId}`)
+      }
     } catch (err: any) {
-      const errorData = err.response?.data
-      setError(errorData?.message || "Failed to join party. Please check the code and try again.")
+      const errorData = err?.response?.data
+      const message = errorData?.message || err?.message
+      setError(message || "Failed to join party. Please check the code and try again.")
     } finally {
       setIsJoining(false)
     }

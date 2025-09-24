@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, Suspense, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -8,12 +8,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { CheckCircle, AlertCircle, Loader2, Play, Sparkles, RefreshCw } from "lucide-react"
 import Link from "next/link"
+import { AuthAPI } from "@/lib/api/auth"
 
 function CallbackHandler() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { refreshUser } = useAuth()
   const { toast } = useToast()
+  const authService = useMemo(() => new AuthAPI(), [])
 
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
   const [message, setMessage] = useState("")
@@ -59,59 +61,43 @@ function CallbackHandler() {
 
     try {
       // Exchange code for tokens
-      const response = await fetch("/api/auth/callback/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          code,
-          state,
-          provider,
-        }),
+      const data = await authService.completeSocialAuth(provider, code, state || undefined)
+
+      if (data.access_token) {
+        localStorage.setItem("access_token", data.access_token)
+        localStorage.setItem("accessToken", data.access_token)
+      }
+      if (data.refresh_token) {
+        localStorage.setItem("refresh_token", data.refresh_token)
+        localStorage.setItem("refreshToken", data.refresh_token)
+      }
+
+      const extra = data as any
+      if (extra?.requires_2fa) {
+        router.push(`/2fa/verify?email=${encodeURIComponent(extra.email ?? "")}&temp_token=${extra.temp_token ?? ""}`)
+        return
+      }
+
+      await refreshUser()
+
+      setStatus("success")
+      setMessage("Authentication successful! Redirecting to your dashboard...")
+
+      toast({
+        title: "Welcome back!",
+        description: `Successfully signed in with ${provider}.`,
       })
 
-      const data = await response.json()
-
-      if (response.ok) {
-        // Store tokens
-        if (data.access_token) {
-          localStorage.setItem("accessToken", data.access_token)
-        }
-        if (data.refresh_token) {
-          localStorage.setItem("refreshToken", data.refresh_token)
-        }
-
-        // Check if 2FA is required
-        if (data.requires_2fa) {
-          router.push(`/2fa/verify?email=${encodeURIComponent(data.email)}&temp_token=${data.temp_token}`)
-          return
-        }
-
-        // Refresh user data
-        await refreshUser()
-
-        setStatus("success")
-        setMessage("Authentication successful! Redirecting to your dashboard...")
-
-        toast({
-          title: "Welcome back!",
-          description: `Successfully signed in with ${provider}.`,
-        })
-
-        // Redirect after a short delay
-        setTimeout(() => {
-          const redirectTo = localStorage.getItem("auth_redirect") || "/dashboard"
-          localStorage.removeItem("auth_redirect")
-          router.push(redirectTo)
-        }, 2000)
-      } else {
-        throw new Error(data.message || "Authentication failed")
-      }
-    } catch (error) {
+      setTimeout(() => {
+        const redirectTo = localStorage.getItem("auth_redirect") || "/dashboard"
+        localStorage.removeItem("auth_redirect")
+        router.push(redirectTo)
+      }, 2000)
+    } catch (error: any) {
       console.error("Callback error:", error)
       setStatus("error")
-      setMessage(error instanceof Error ? error.message : "An unexpected error occurred during authentication.")
+      const message = error?.response?.data?.message || (error instanceof Error ? error.message : undefined)
+      setMessage(message || "An unexpected error occurred during authentication.")
     }
   }
 

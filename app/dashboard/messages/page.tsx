@@ -146,21 +146,19 @@ export default function MessagesPage() {
   const loadOnlineUsers = async () => {
     try {
       const data = await messagingAPI.getOnlineFriends()
-      setOnlineUsers(data || [])
+      const friends = Array.isArray(data)
+        ? data
+        : data?.results || []
+      setOnlineUsers(friends)
     } catch (error) {
       console.error("Failed to load online users:", error)
     }
   }
 
-  const markConversationAsRead = async (conversationId: string) => {
-    try {
-      await messagingAPI.markConversationAsRead(conversationId)
-      setConversations(prev => prev.map(conv => 
-        conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
-      ))
-    } catch (error) {
-      console.error("Failed to mark conversation as read:", error)
-    }
+  const markConversationAsRead = (conversationId: string) => {
+    setConversations(prev =>
+      prev.map(conv => (conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv))
+    )
   }
 
   const sendMessage = async () => {

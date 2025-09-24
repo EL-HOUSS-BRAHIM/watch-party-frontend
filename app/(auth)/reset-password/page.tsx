@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, Suspense, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,11 +11,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { Eye, EyeOff, Lock, Shield, CheckCircle, AlertCircle, ArrowLeft, Key, Sparkles } from "lucide-react"
 import Link from "next/link"
+import { AuthAPI } from "@/lib/api/auth"
 
 function ResetPasswordForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const authService = useMemo(() => new AuthAPI(), [])
 
   const [formData, setFormData] = useState({
     password: "",
@@ -25,48 +27,17 @@ function ResetPasswordForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [isValidToken, setIsValidToken] = useState<boolean | null>(null)
   const [passwordStrength, setPasswordStrength] = useState(0)
 
   const token = searchParams.get("token")
   const email = searchParams.get("email")
-
-  useEffect(() => {
-    if (!token || !email) {
-      setIsValidToken(false)
-      return
-    }
-
-    // Validate token
-    validateResetToken()
-  }, [token, email])
+  const displayEmail = email ?? "your account"
 
   useEffect(() => {
     // Calculate password strength
     const strength = calculatePasswordStrength(formData.password)
     setPasswordStrength(strength)
   }, [formData.password])
-
-  const validateResetToken = async () => {
-    try {
-      const response = await fetch("/api/auth/validate-reset-token/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token, email }),
-      })
-
-      if (response.ok) {
-        setIsValidToken(true)
-      } else {
-        setIsValidToken(false)
-      }
-    } catch (error) {
-      console.error("Token validation error:", error)
-      setIsValidToken(false)
-    }
-  }
 
   const calculatePasswordStrength = (password: string): number => {
     let strength = 0
@@ -118,25 +89,22 @@ function ResetPasswordForm() {
 
     if (!validateForm()) return
 
+    if (!token) {
+      setErrors({ submit: "This reset link is invalid or has expired." })
+      return
+    }
+
     setIsLoading(true)
     setErrors({})
 
     try {
-      const response = await fetch("/api/auth/reset-password/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token,
-          email,
-          password: formData.password,
-        }),
+      const response = await authService.resetPassword({
+        token: token || "",
+        new_password: formData.password,
+        confirm_password: formData.password,
       })
 
-      const data = await response.json()
-
-      if (response.ok) {
+      if (response?.success) {
         toast({
           title: "Password Reset Successful",
           description: "Your password has been updated. You can now sign in with your new password.",
@@ -147,11 +115,12 @@ function ResetPasswordForm() {
           router.push("/login?message=password-reset-success")
         }, 2000)
       } else {
-        setErrors({ submit: data.message || "Failed to reset password" })
+        setErrors({ submit: response?.message || "Failed to reset password" })
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Reset password error:", error)
-      setErrors({ submit: "An unexpected error occurred. Please try again." })
+      const message = error?.response?.data?.message || error?.message || "An unexpected error occurred. Please try again."
+      setErrors({ submit: message })
     } finally {
       setIsLoading(false)
     }
@@ -167,19 +136,7 @@ function ResetPasswordForm() {
     }
   }
 
-  if (isValidToken === null) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-white mb-2">Validating Reset Link</h2>
-          <p className="text-gray-400">Please wait while we verify your reset token...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (isValidToken === false) {
+  if (!token) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
         <div className="max-w-md w-full">
@@ -228,7 +185,7 @@ function ResetPasswordForm() {
 
             <h1 className="text-2xl font-bold text-white mb-2">Reset Your Password</h1>
             <p className="text-gray-400">
-              Enter your new password for <span className="text-purple-300">{email}</span>
+              Enter your new password for <span className="text-purple-300">{displayEmail}</span>
             </p>
           </div>
 

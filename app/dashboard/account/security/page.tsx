@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -36,6 +36,7 @@ import {
   Monitor,
 } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
+import { AuthAPI } from "@/lib/api/auth"
 
 // Validation schemas
 const changePasswordSchema = z
@@ -99,6 +100,7 @@ export default function SecuritySettingsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
+  const authService = useMemo(() => new AuthAPI(), [])
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setSaving] = useState(false)
@@ -138,37 +140,23 @@ export default function SecuritySettingsPage() {
   const loadSecurityData = async () => {
     setIsLoading(true)
     try {
-      const token = localStorage.getItem("accessToken")
+      const sessionsData = await authService.getSessions()
+      const mappedSessions: LoginSession[] = (sessionsData || []).map((session: any) => ({
+        id: session.id,
+        deviceName: session.device || session.device_name || "Unknown device",
+        deviceType: (session.device_type || "desktop") as LoginSession["deviceType"],
+        browser: session.browser || session.user_agent || "Unknown",
+        location: session.location || "Unknown",
+        ipAddress: session.ip_address || "Unknown",
+        lastActive: session.last_activity || session.last_active || new Date().toISOString(),
+        isCurrent: Boolean(session.is_current),
+        createdAt: session.created_at || session.started_at || new Date().toISOString(),
+      }))
+      setSessions(mappedSessions)
 
-      // Load security settings
-      const settingsResponse = await fetch("/api/users/security/settings/", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (settingsResponse.ok) {
-        const settingsData = await settingsResponse.json()
-        setSettings(settingsData)
-      }
-
-      // Load active sessions
-      const sessionsResponse = await fetch("/api/users/security/sessions/", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (sessionsResponse.ok) {
-        const sessionsData = await sessionsResponse.json()
-        setSessions(sessionsData.results || [])
-      }
-
-      // Load security events
-      const eventsResponse = await fetch("/api/users/security/events/", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (eventsResponse.ok) {
-        const eventsData = await eventsResponse.json()
-        setSecurityEvents(eventsData.results || [])
-      }
+      // Security events endpoint isn't available in the backend specification.
+      // Clear previous events to avoid showing stale data.
+      setSecurityEvents([])
     } catch (error) {
       console.error("Failed to load security data:", error)
       toast({
@@ -222,17 +210,17 @@ export default function SecuritySettingsPage() {
 
   const setup2FA = async () => {
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await fetch("/api/auth/2fa/setup/", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setTwoFactorSetup(data)
-        setShow2FADialog(true)
+      const data = await authService.setup2FA()
+      if (!data?.secret) {
+        throw new Error("Missing secret in setup response")
       }
+
+      setTwoFactorSetup({
+        qrCode: data.qr_code || `otpauth://totp/WatchParty?secret=${data.secret}`,
+        secret: data.secret,
+        backupCodes: data.backup_codes || [],
+      })
+      setShow2FADialog(true)
     } catch (error) {
       console.error("2FA setup error:", error)
       toast({
@@ -247,35 +235,29 @@ export default function SecuritySettingsPage() {
     if (!verificationCode.trim() || !twoFactorSetup) return
 
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await fetch("/api/auth/2fa/verify/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          code: verificationCode,
-          secret: twoFactorSetup.secret,
-        }),
-      })
+      const response = await authService.verify2FA(verificationCode, { context: "setup" })
 
-      if (response.ok) {
-        setSettings((prev) => ({ ...prev, twoFactorEnabled: true }))
-        setShow2FADialog(false)
-        setShowBackupCodes(true)
-        setVerificationCode("")
-        toast({
-          title: "2FA Enabled",
-          description: "Two-factor authentication has been enabled successfully.",
-        })
-      } else {
+      if (!response?.success) {
         toast({
           title: "Verification Failed",
-          description: "Invalid verification code. Please try again.",
+          description: response?.message || "Invalid verification code. Please try again.",
           variant: "destructive",
         })
+        return
       }
+
+      if (response.backup_codes) {
+        setTwoFactorSetup(prev => prev ? { ...prev, backupCodes: response.backup_codes ?? prev.backupCodes } : prev)
+      }
+
+      setSettings((prev) => ({ ...prev, twoFactorEnabled: true }))
+      setShow2FADialog(false)
+      setShowBackupCodes(true)
+      setVerificationCode("")
+      toast({
+        title: "2FA Enabled",
+        description: "Two-factor authentication has been enabled successfully.",
+      })
     } catch (error) {
       console.error("2FA verification error:", error)
       toast({
@@ -294,19 +276,12 @@ export default function SecuritySettingsPage() {
     }
 
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await fetch("/api/auth/2fa/disable/", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+      await authService.disable2FA()
+      setSettings((prev) => ({ ...prev, twoFactorEnabled: false }))
+      toast({
+        title: "2FA Disabled",
+        description: "Two-factor authentication has been disabled.",
       })
-
-      if (response.ok) {
-        setSettings((prev) => ({ ...prev, twoFactorEnabled: false }))
-        toast({
-          title: "2FA Disabled",
-          description: "Two-factor authentication has been disabled.",
-        })
-      }
     } catch (error) {
       console.error("2FA disable error:", error)
       toast({
@@ -320,25 +295,12 @@ export default function SecuritySettingsPage() {
   const updateSettings = async (newSettings: Partial<SecuritySettings>) => {
     setSaving(true)
     try {
-      const token = localStorage.getItem("accessToken")
       const updatedSettings = { ...settings, ...newSettings }
-
-      const response = await fetch("/api/users/security/settings/", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(updatedSettings),
+      setSettings(updatedSettings)
+      toast({
+        title: "Settings Updated",
+        description: "Your security settings have been saved locally.",
       })
-
-      if (response.ok) {
-        setSettings(updatedSettings)
-        toast({
-          title: "Settings Updated",
-          description: "Your security settings have been saved.",
-        })
-      }
     } catch (error) {
       console.error("Settings update error:", error)
       toast({
@@ -353,19 +315,12 @@ export default function SecuritySettingsPage() {
 
   const terminateSession = async (sessionId: string) => {
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await fetch(`/api/users/security/sessions/${sessionId}/`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+      await authService.deleteSession(sessionId)
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId))
+      toast({
+        title: "Session Terminated",
+        description: "The session has been terminated successfully.",
       })
-
-      if (response.ok) {
-        setSessions((prev) => prev.filter((s) => s.id !== sessionId))
-        toast({
-          title: "Session Terminated",
-          description: "The session has been terminated successfully.",
-        })
-      }
     } catch (error) {
       console.error("Session termination error:", error)
       toast({
@@ -382,19 +337,12 @@ export default function SecuritySettingsPage() {
     }
 
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await fetch("/api/users/security/sessions/terminate-all/", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+      await authService.revokeAllSessions()
+      setSessions((prev) => prev.filter((s) => s.isCurrent))
+      toast({
+        title: "Sessions Terminated",
+        description: "All other sessions have been terminated.",
       })
-
-      if (response.ok) {
-        setSessions((prev) => prev.filter((s) => s.isCurrent))
-        toast({
-          title: "Sessions Terminated",
-          description: "All other sessions have been terminated.",
-        })
-      }
     } catch (error) {
       console.error("Terminate all sessions error:", error)
       toast({

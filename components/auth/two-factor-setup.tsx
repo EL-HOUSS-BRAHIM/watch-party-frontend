@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator"
 import { QRCodeSVG } from "qrcode.react"
 import { Copy, CheckCircle, AlertCircle, Shield } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useApi } from "@/hooks/use-api"
+import { authAPI } from "@/lib/api"
 
 interface TwoFactorSetupData {
   qr_code: string
@@ -27,7 +27,6 @@ export function TwoFactorSetup() {
   const [copiedBackupCodes, setCopiedBackupCodes] = useState(false)
   
   const { toast } = useToast()
-  const api = useApi()
 
   useEffect(() => {
     generateSetupData()
@@ -35,8 +34,17 @@ export function TwoFactorSetup() {
 
   const generateSetupData = async () => {
     try {
-      const response = await api.post("/auth/2fa/setup/")
-      setSetupData(response.data)
+      const response = await authAPI.setup2FA()
+      if (!response?.secret) {
+        throw new Error("Missing secret in setup response")
+      }
+
+      const qrValue = response.qr_code || `otpauth://totp/WatchParty?secret=${response.secret}`
+      setSetupData({
+        qr_code: qrValue,
+        secret_key: response.secret,
+        backup_codes: response.backup_codes || [],
+      })
     } catch (err) {
       setError("Failed to generate 2FA setup data")
     }
@@ -72,16 +80,22 @@ export function TwoFactorSetup() {
     setError("")
 
     try {
-      await api.post("/auth/2fa/verify/", {
-        code: verificationCode
-      })
+      const response = await authAPI.verify2FA(verificationCode, { context: "setup" })
+      if (!response?.success) {
+        throw new Error(response?.message || "Invalid verification code")
+      }
+
+      if (response.backup_codes?.length) {
+        setSetupData((prev) => prev ? { ...prev, backup_codes: response.backup_codes! } : prev)
+      }
+
       setIsSetupComplete(true)
       toast({
         title: "2FA Enabled!",
         description: "Two-factor authentication has been successfully enabled",
       })
-    } catch (err) {
-      setError("Invalid verification code. Please try again.")
+    } catch (err: any) {
+      setError(err?.message || "Invalid verification code. Please try again.")
     } finally {
       setIsVerifying(false)
     }
