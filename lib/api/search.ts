@@ -8,7 +8,6 @@ import { API_ENDPOINTS } from "./endpoints"
 import type {
   SearchResult,
   DiscoverContent,
-  APIResponse,
 } from "./types"
 
 export class SearchAPI {
@@ -41,15 +40,7 @@ export class SearchAPI {
     trending?: boolean
     recommended?: boolean
     limit?: number
-  }): Promise<{
-    success: boolean
-    content: DiscoverContent
-    recommendations: {
-      videos: any[]
-      parties: any[]
-      users: any[]
-    }
-  }> {
+  }): Promise<DiscoverContent> {
     return apiClient.get(API_ENDPOINTS.search.discover, { params })
   }
 }

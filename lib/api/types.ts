@@ -158,10 +158,31 @@ export interface SearchResult {
   relevance_score: number
 }
 
+export interface DiscoverRecommendation {
+  type?: string
+  metadata?: Record<string, any>
+  [key: string]: any
+}
+
+export interface DiscoverCategory {
+  id?: string | number
+  name: string
+  description?: string
+  icon?: string
+  content_count?: number
+  video_count?: number
+  item_count?: number
+  trend_direction?: 'up' | 'down' | 'steady'
+  is_growing?: boolean
+  [key: string]: any
+}
+
 export interface DiscoverContent {
-  trending_videos: Video[]
-  popular_parties: Party[]
-  suggested_users: User[]
+  featured_videos?: Array<Record<string, any>>
+  trending_parties?: Array<Record<string, any>>
+  recommended_content?: DiscoverRecommendation[]
+  popular_categories?: DiscoverCategory[]
+  platform_stats?: Record<string, any>
 }
 
 // Social Types
@@ -669,7 +690,7 @@ export interface BillingHistory {
 // Notification types
 export interface Notification {
   id: string
-  type: 'friend_request' | 'party_invite' | 'video_upload' | 'system'
+  type: string
   title: string
   message: string
   action_data?: Record<string, any>
@@ -691,10 +712,16 @@ export interface NotificationPreferences {
 // Analytics types
 export interface AnalyticsDashboard {
   overview: {
-    total_users: number
-    active_users_today: number
-    total_parties: number
-    total_watch_time_hours: number
+    total_users?: number
+    active_users_today?: number
+    active_parties?: number
+    total_parties?: number
+    total_watch_time_hours?: number
+    total_watch_time?: number
+    videos_watched?: number
+    watch_time?: number
+    new_users_today?: number
+    [key: string]: any
   }
   trends: Record<string, any>
   top_videos: Array<Record<string, any>>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Heart, MessageCircle, Play, Users, Clock, Sparkles } from 'lucide-react';
+import { usersAPI } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface ActivityItem {
   id: string;
@@ -52,150 +54,114 @@ const ActivityIcon = ({ type }: { type: ActivityItem['type'] }) => {
   }
 };
 
+const fallbackId = (prefix: string) =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `${prefix}-${crypto.randomUUID()}`
+    : `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+
+const resolveActivityType = (rawType: any): ActivityItem['type'] => {
+  const type = typeof rawType === 'string' ? rawType.toLowerCase() : '';
+
+  if (type.includes('friend')) return 'friend_added';
+  if (type.includes('achievement')) return 'achievement';
+  if (type.includes('comment')) return 'comment';
+  if (type.includes('like')) return 'like_video';
+  if (type.includes('party')) return 'join_party';
+  return 'watch_video';
+};
+
+const normalizePrivacy = (privacy: any): ActivityItem['privacy'] => {
+  const value = typeof privacy === 'string' ? privacy.toLowerCase() : '';
+  if (value === 'friends' || value === 'friends_only') return 'friends_only';
+  if (value === 'private') return 'private';
+  return 'public';
+};
+
+const formatTimestamp = (timestamp: string) => {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+  return date.toLocaleString();
+};
+
+const normalizeActivity = (activity: any): ActivityItem => {
+  const activityType = resolveActivityType(activity?.activity_type ?? activity?.type);
+  const user = activity?.user ?? {};
+  const metadata = activity?.metadata ?? activity?.content ?? {};
+
+  const title =
+    metadata.title ??
+    metadata.name ??
+    metadata.video_title ??
+    metadata.party_name ??
+    metadata.achievement_name ??
+    'Activity update';
+
+  const description = metadata.description ?? metadata.summary ?? null;
+
+  return {
+    id: String(activity?.id ?? fallbackId('activity')),
+    userId: String(user?.id ?? activity?.user_id ?? fallbackId('user')),
+    user: {
+      id: String(user?.id ?? activity?.user_id ?? fallbackId('user')),
+      username: user?.username ?? user?.handle ?? 'user',
+      displayName: user?.display_name ?? user?.name ?? user?.username ?? 'Friend',
+      avatar: user?.avatar ?? user?.avatar_url ?? '/placeholder-user.jpg',
+      isOnline: Boolean(user?.is_online ?? false),
+      lastSeen: user?.last_seen ?? user?.last_activity ?? undefined,
+    },
+    type: activityType,
+    content: {
+      title,
+      description: description ?? undefined,
+      thumbnail: metadata.thumbnail ?? metadata.thumbnail_url ?? undefined,
+      videoId: metadata.video_id ?? metadata.videoId ?? activity?.video_id ?? undefined,
+      partyId: metadata.party_id ?? metadata.partyId ?? activity?.party_id ?? undefined,
+      achievementId: metadata.achievement_id ?? metadata.achievementId ?? undefined,
+    },
+    timestamp: formatTimestamp(activity?.created_at ?? activity?.timestamp ?? new Date().toISOString()),
+    privacy: normalizePrivacy(activity?.privacy ?? activity?.visibility),
+  };
+};
+
 export default function FriendsActivityFeed() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | ActivityItem['type']>('all');
   const [timeframe, setTimeframe] = useState('today');
+  const { toast } = useToast();
 
-  useEffect(() => {
-    fetchActivities();
-  }, [filter, timeframe]);
-
-  const fetchActivities = async () => {
+  const fetchActivities = useCallback(async () => {
     setLoading(true);
     try {
-      // Mock data - replace with actual API call
-      const mockActivities: ActivityItem[] = [
-        {
-          id: '1',
-          userId: 'user1',
-          user: {
-            id: 'user1',
-            username: 'alex_movie_fan',
-            displayName: 'Alex Chen',
-            avatar: '/placeholder-user.jpg',
-            isOnline: true,
-          },
-          type: 'watch_video',
-          content: {
-            title: 'Watched "The Matrix"',
-            description: 'Completed watching in Party Room #42',
-            thumbnail: '/placeholder.jpg',
-            videoId: 'video123',
-            partyId: 'party42',
-          },
-          timestamp: '2 minutes ago',
-          privacy: 'friends_only',
-        },
-        {
-          id: '2',
-          userId: 'user2',
-          user: {
-            id: 'user2',
-            username: 'sarah_streamer',
-            displayName: 'Sarah Johnson',
-            avatar: '/placeholder-user.jpg',
-            isOnline: true,
-          },
-          type: 'achievement',
-          content: {
-            title: 'Unlocked "Movie Marathon" achievement',
-            description: 'Watched 10 movies this week!',
-            achievementId: 'marathon',
-          },
-          timestamp: '15 minutes ago',
-          privacy: 'public',
-        },
-        {
-          id: '3',
-          userId: 'user3',
-          user: {
-            id: 'user3',
-            username: 'mike_director',
-            displayName: 'Mike Rodriguez',
-            avatar: '/placeholder-user.jpg',
-            isOnline: false,
-            lastSeen: '1 hour ago',
-          },
-          type: 'join_party',
-          content: {
-            title: 'Joined "Horror Movie Night"',
-            description: 'Now watching with 12 other people',
-            partyId: 'party789',
-          },
-          timestamp: '1 hour ago',
-          privacy: 'friends_only',
-        },
-        {
-          id: '4',
-          userId: 'user4',
-          user: {
-            id: 'user4',
-            username: 'emma_critic',
-            displayName: 'Emma Watson',
-            avatar: '/placeholder-user.jpg',
-            isOnline: true,
-          },
-          type: 'like_video',
-          content: {
-            title: 'Liked "Inception"',
-            description: 'Great cinematography and storytelling!',
-            thumbnail: '/placeholder.jpg',
-            videoId: 'video456',
-          },
-          timestamp: '2 hours ago',
-          privacy: 'public',
-        },
-        {
-          id: '5',
-          userId: 'user5',
-          user: {
-            id: 'user5',
-            username: 'david_casual',
-            displayName: 'David Kim',
-            avatar: '/placeholder-user.jpg',
-            isOnline: false,
-            lastSeen: '3 hours ago',
-          },
-          type: 'friend_added',
-          content: {
-            title: 'Added 3 new friends',
-            description: 'Connected through Movie Club group',
-          },
-          timestamp: '4 hours ago',
-          privacy: 'friends_only',
-        },
-        {
-          id: '6',
-          userId: 'user6',
-          user: {
-            id: 'user6',
-            username: 'lisa_reviewer',
-            displayName: 'Lisa Park',
-            avatar: '/placeholder-user.jpg',
-            isOnline: true,
-          },
-          type: 'comment',
-          content: {
-            title: 'Commented on "Dune"',
-            description: 'Amazing visuals! Hans Zimmer\'s score is incredible.',
-            thumbnail: '/placeholder.jpg',
-            videoId: 'video789',
-          },
-          timestamp: '6 hours ago',
-          privacy: 'public',
-        },
-      ];
+      const params: Record<string, any> = { page: 1 };
+      if (filter !== 'all') {
+        params.type = filter;
+      }
+      if (timeframe) {
+        params.timeframe = timeframe;
+      }
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setActivities(mockActivities);
+      const response = await usersAPI.getActivity(params);
+      const results = Array.isArray(response?.results) ? response.results : [];
+      setActivities(results.map((item: any) => normalizeActivity(item)));
     } catch (error) {
       console.error('Failed to fetch activities:', error);
+      toast({
+        title: 'Could not load friend activity',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
+      setActivities([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, timeframe, toast]);
+
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
 
   const filteredActivities = activities.filter(activity => 
     filter === 'all' || activity.type === filter

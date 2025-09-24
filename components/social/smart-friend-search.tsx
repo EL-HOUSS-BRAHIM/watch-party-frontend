@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Filter, UserPlus, Users, Star, MapPin, Calendar } from 'lucide-react';
+import { Search, Filter, UserPlus, Users, Star, MapPin, Calendar, RefreshCw } from 'lucide-react';
+import { usersAPI } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface User {
   id: string;
@@ -42,10 +44,94 @@ interface SearchFilters {
   genres: string[];
 }
 
+const fallbackId = (prefix: string) =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `${prefix}-${crypto.randomUUID()}`
+    : `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+
+const normalizeSearchUser = (user: any): User => ({
+  id: String(user?.id ?? user?.user_id ?? user?.username ?? fallbackId('user')),
+  username: user?.username ?? user?.handle ?? 'user',
+  displayName:
+    user?.display_name ??
+    user?.name ??
+    user?.full_name ??
+    user?.user?.display_name ??
+    user?.username ??
+    'User',
+  avatar:
+    user?.avatar_url ??
+    user?.avatar ??
+    user?.profile_image ??
+    user?.user?.avatar ??
+    '/placeholder-user.jpg',
+  isOnline: Boolean(user?.is_online ?? user?.online ?? user?.status === 'online'),
+  mutualFriends: user?.mutual_friends_count ?? user?.mutual_friends ?? user?.mutualFriends ?? 0,
+  commonInterests: Array.isArray(user?.common_interests)
+    ? user.common_interests
+    : Array.isArray(user?.interests)
+      ? user.interests
+      : Array.isArray(user?.genres)
+        ? user.genres
+        : [],
+  location: user?.location ?? user?.city ?? user?.region,
+  joinedDate: user?.joined_at ?? user?.created_at ?? new Date().toISOString(),
+  watchedGenres: Array.isArray(user?.watched_genres)
+    ? user.watched_genres
+    : Array.isArray(user?.favorite_genres)
+      ? user.favorite_genres
+      : [],
+  favoriteMovies: Array.isArray(user?.favorite_movies) ? user.favorite_movies : [],
+  isVerified: Boolean(user?.is_verified ?? user?.verified),
+  friendshipStatus: user?.friendship_status ?? 'none',
+  bio: user?.bio ?? user?.about ?? '',
+  stats: {
+    moviesWatched: user?.stats?.movies_watched ?? user?.movies_watched ?? 0,
+    partiesHosted: user?.stats?.parties_hosted ?? user?.parties_hosted ?? 0,
+    friendsCount: user?.stats?.friends_count ?? user?.friends_count ?? 0,
+  },
+});
+
+const buildSearchParams = (searchTerm: string, filters: SearchFilters) => {
+  const params: Record<string, any> = {
+    q: searchTerm,
+    limit: 20,
+    sort: filters.sortBy,
+  };
+
+  if (filters.location !== 'any') {
+    params.location = filters.location;
+  }
+
+  if (filters.hasAvatar) {
+    params.has_avatar = true;
+  }
+
+  if (filters.isOnline) {
+    params.is_online = true;
+  }
+
+  if (filters.verifiedOnly) {
+    params.verified = true;
+  }
+
+  if (filters.minMutualFriends > 0) {
+    params.min_mutual_friends = filters.minMutualFriends;
+  }
+
+  if (filters.genres.length > 0) {
+    params.genres = filters.genres;
+  }
+
+  return params;
+};
+
 export default function SmartFriendSearch() {
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<User[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [filters, setFilters] = useState<SearchFilters>({
     sortBy: 'relevance',
     location: 'any',
@@ -55,11 +141,30 @@ export default function SmartFriendSearch() {
     minMutualFriends: 0,
     genres: [],
   });
+  const { toast } = useToast();
 
   const availableGenres = [
-    'Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 
+    'Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi',
     'Romance', 'Thriller', 'Documentary', 'Animation', 'Fantasy'
   ];
+
+  const loadSuggestions = useCallback(async () => {
+    setLoadingSuggestions(true);
+    try {
+      const response = await usersAPI.getFriendSuggestions({ limit: 12 });
+      const normalized = (response ?? []).map((item: any) => normalizeSearchUser(item));
+      setSuggestions(normalized);
+    } catch (error) {
+      console.error('Failed to load friend suggestions:', error);
+      toast({
+        title: 'Unable to load suggestions',
+        description: 'Please try refreshing suggestions in a moment.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
     if (searchTerm.length > 2) {
@@ -69,135 +174,189 @@ export default function SmartFriendSearch() {
     }
   }, [searchTerm, filters]);
 
+  useEffect(() => {
+    loadSuggestions();
+  }, [loadSuggestions]);
+
   const searchUsers = async () => {
     setLoading(true);
     try {
-      // Mock data - replace with actual API call
-      const mockUsers: User[] = [
-        {
-          id: '1',
-          username: 'movie_buff_alex',
-          displayName: 'Alex Chen',
-          avatar: '/placeholder-user.jpg',
-          isOnline: true,
-          mutualFriends: 12,
-          commonInterests: ['Sci-Fi', 'Thriller', 'Action'],
-          location: 'San Francisco, CA',
-          joinedDate: '2023-01-15',
-          watchedGenres: ['Sci-Fi', 'Action', 'Thriller'],
-          favoriteMovies: ['The Matrix', 'Inception', 'Blade Runner'],
-          isVerified: true,
-          friendshipStatus: 'none',
-          bio: 'Love discussing plot twists and cinematography. Always up for a good sci-fi marathon!',
-          stats: {
-            moviesWatched: 245,
-            partiesHosted: 18,
-            friendsCount: 89,
-          },
-        },
-        {
-          id: '2',
-          username: 'sarah_movie_nights',
-          displayName: 'Sarah Johnson',
-          avatar: '/placeholder-user.jpg',
-          isOnline: false,
-          mutualFriends: 8,
-          commonInterests: ['Horror', 'Comedy'],
-          location: 'New York, NY',
-          joinedDate: '2023-03-22',
-          watchedGenres: ['Horror', 'Comedy', 'Drama'],
-          favoriteMovies: ['Get Out', 'Hereditary', 'The Office'],
-          isVerified: false,
-          friendshipStatus: 'pending_sent',
-          bio: 'Horror movie enthusiast and comedy lover. Host weekly movie nights!',
-          stats: {
-            moviesWatched: 189,
-            partiesHosted: 25,
-            friendsCount: 156,
-          },
-        },
-        {
-          id: '3',
-          username: 'mike_cinema_critic',
-          displayName: 'Mike Rodriguez',
-          avatar: '/placeholder-user.jpg',
-          isOnline: true,
-          mutualFriends: 15,
-          commonInterests: ['Drama', 'Documentary', 'Foreign Films'],
-          location: 'Los Angeles, CA',
-          joinedDate: '2022-11-08',
-          watchedGenres: ['Drama', 'Documentary', 'Romance'],
-          favoriteMovies: ['Parasite', 'The Godfather', 'Citizen Kane'],
-          isVerified: true,
-          friendshipStatus: 'friends',
-          bio: 'Film school graduate. Love analyzing cinematography and storytelling techniques.',
-          stats: {
-            moviesWatched: 412,
-            partiesHosted: 8,
-            friendsCount: 203,
-          },
-        },
-      ];
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setUsers(mockUsers);
+      const params = buildSearchParams(searchTerm, filters);
+      const response = await usersAPI.searchUsers(params);
+      const results = Array.isArray(response?.results) ? response.results : response?.users ?? [];
+      setUsers(results.map((result: any) => normalizeSearchUser(result)));
     } catch (error) {
       console.error('Failed to search users:', error);
+      toast({
+        title: 'Search failed',
+        description: 'We could not complete that search. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredUsers = useMemo(() => {
-    let filtered = users.filter(user => {
+  const applyFilters = (list: User[]) => {
+    const filtered = list.filter(user => {
       if (filters.hasAvatar && !user.avatar) return false;
       if (filters.isOnline && !user.isOnline) return false;
       if (filters.verifiedOnly && !user.isVerified) return false;
       if (user.mutualFriends < filters.minMutualFriends) return false;
       if (filters.genres.length > 0) {
-        const hasCommonGenre = filters.genres.some(genre => 
-          user.watchedGenres.includes(genre)
-        );
+        const hasCommonGenre = filters.genres.some(genre => user.watchedGenres.includes(genre));
         if (!hasCommonGenre) return false;
       }
       return true;
     });
 
-    // Sort results
+    const sorted = [...filtered];
+
     switch (filters.sortBy) {
       case 'mutual_friends':
-        filtered.sort((a, b) => b.mutualFriends - a.mutualFriends);
+        sorted.sort((a, b) => b.mutualFriends - a.mutualFriends);
         break;
       case 'activity':
-        filtered.sort((a, b) => b.stats.moviesWatched - a.stats.moviesWatched);
+        sorted.sort((a, b) => b.stats.moviesWatched - a.stats.moviesWatched);
         break;
       case 'recent':
-        filtered.sort((a, b) => new Date(b.joinedDate).getTime() - new Date(a.joinedDate).getTime());
+        sorted.sort((a, b) => new Date(b.joinedDate).getTime() - new Date(a.joinedDate).getTime());
         break;
-      default: // relevance
-        filtered.sort((a, b) => {
+      default:
+        sorted.sort((a, b) => {
           const aScore = a.mutualFriends * 2 + a.commonInterests.length;
           const bScore = b.mutualFriends * 2 + b.commonInterests.length;
           return bScore - aScore;
         });
     }
 
-    return filtered;
-  }, [users, filters]);
+    return sorted;
+  };
+
+  const filteredUsers = useMemo(() => applyFilters(users), [users, filters]);
+  const filteredSuggestions = useMemo(() => applyFilters(suggestions), [suggestions, filters]);
+
+  const UserCard = ({ user }: { user: User }) => (
+    <Card key={user.id} className="hover:shadow-md transition-shadow">
+      <CardContent className="p-6">
+        <div className="flex items-start gap-4">
+          <div className="relative">
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={user.avatar} alt={user.displayName} />
+              <AvatarFallback>
+                {user.displayName
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')}
+              </AvatarFallback>
+            </Avatar>
+            {user.isOnline && (
+              <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-background"></div>
+            )}
+            {user.isVerified && (
+              <div className="absolute -top-1 -right-1">
+                <Star className="h-5 w-5 text-blue-500 fill-current" />
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="font-semibold text-lg">{user.displayName}</h3>
+              <span className="text-muted-foreground">@{user.username}</span>
+            </div>
+
+            {user.bio && <p className="text-sm text-muted-foreground mb-3">{user.bio}</p>}
+
+            <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
+              {user.location && (
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  {user.location}
+                </div>
+              )}
+              <div className="flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                Joined {new Date(user.joinedDate).toLocaleDateString()}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 mb-4 text-center">
+              <div>
+                <div className="font-semibold">{user.stats.moviesWatched}</div>
+                <div className="text-xs text-muted-foreground">Movies</div>
+              </div>
+              <div>
+                <div className="font-semibold">{user.stats.partiesHosted}</div>
+                <div className="text-xs text-muted-foreground">Parties</div>
+              </div>
+              <div>
+                <div className="font-semibold">{user.stats.friendsCount}</div>
+                <div className="text-xs text-muted-foreground">Friends</div>
+              </div>
+            </div>
+
+            {user.mutualFriends > 0 && (
+              <div className="mb-3">
+                <Badge variant="secondary" className="mb-2">
+                  {user.mutualFriends} mutual friends
+                </Badge>
+              </div>
+            )}
+
+            {user.commonInterests.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-4">
+                {user.commonInterests.map((interest, index) => (
+                  <Badge key={index} variant="outline" className="text-xs">
+                    {interest}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {getFriendshipButton(user)}
+            <Button variant="ghost" size="sm">
+              View Profile
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   const handleSendFriendRequest = async (userId: string) => {
     try {
-      // API call to send friend request
-      console.log('Sending friend request to:', userId);
-      
-      setUsers(users.map(user => 
-        user.id === userId 
-          ? { ...user, friendshipStatus: 'pending_sent' }
-          : user
-      ));
+      await usersAPI.sendFriendRequestToUser(userId);
+
+      setUsers(prev =>
+        prev.map(user =>
+          user.id === userId
+            ? { ...user, friendshipStatus: 'pending_sent' }
+            : user
+        )
+      );
+
+      setSuggestions(prev =>
+        prev.map(user =>
+          user.id === userId
+            ? { ...user, friendshipStatus: 'pending_sent' }
+            : user
+        )
+      );
+
+      toast({
+        title: 'Friend request sent',
+        description: 'We let them know you want to connect.',
+      });
     } catch (error) {
       console.error('Failed to send friend request:', error);
+      toast({
+        title: 'Unable to send request',
+        description: 'Please try again in a moment.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -205,14 +364,34 @@ export default function SmartFriendSearch() {
     try {
       // API call to accept friend request
       console.log('Accepting friend request from:', userId);
-      
-      setUsers(users.map(user => 
-        user.id === userId 
-          ? { ...user, friendshipStatus: 'friends' }
-          : user
-      ));
+
+      setUsers(prev =>
+        prev.map(user =>
+          user.id === userId
+            ? { ...user, friendshipStatus: 'friends' }
+            : user
+        )
+      );
+
+      setSuggestions(prev =>
+        prev.map(user =>
+          user.id === userId
+            ? { ...user, friendshipStatus: 'friends' }
+            : user
+        )
+      );
+
+      toast({
+        title: 'Friend request accepted',
+        description: 'You are now connected.',
+      });
     } catch (error) {
       console.error('Failed to accept friend request:', error);
+      toast({
+        title: 'Unable to update request',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -303,92 +482,7 @@ export default function SmartFriendSearch() {
           ) : filteredUsers.length > 0 ? (
             <div className="space-y-4">
               {filteredUsers.map((user) => (
-                <Card key={user.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-4">
-                      <div className="relative">
-                        <Avatar className="h-16 w-16">
-                          <AvatarImage src={user.avatar} alt={user.displayName} />
-                          <AvatarFallback>
-                            {user.displayName.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        {user.isOnline && (
-                          <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-background"></div>
-                        )}
-                        {user.isVerified && (
-                          <div className="absolute -top-1 -right-1">
-                            <Star className="h-5 w-5 text-blue-500 fill-current" />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold text-lg">{user.displayName}</h3>
-                          <span className="text-muted-foreground">@{user.username}</span>
-                        </div>
-
-                        {user.bio && (
-                          <p className="text-sm text-muted-foreground mb-3">{user.bio}</p>
-                        )}
-
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
-                          {user.location && (
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4" />
-                              {user.location}
-                            </div>
-                          )}
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            Joined {new Date(user.joinedDate).toLocaleDateString()}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4 mb-4 text-center">
-                          <div>
-                            <div className="font-semibold">{user.stats.moviesWatched}</div>
-                            <div className="text-xs text-muted-foreground">Movies</div>
-                          </div>
-                          <div>
-                            <div className="font-semibold">{user.stats.partiesHosted}</div>
-                            <div className="text-xs text-muted-foreground">Parties</div>
-                          </div>
-                          <div>
-                            <div className="font-semibold">{user.stats.friendsCount}</div>
-                            <div className="text-xs text-muted-foreground">Friends</div>
-                          </div>
-                        </div>
-
-                        {user.mutualFriends > 0 && (
-                          <div className="mb-3">
-                            <Badge variant="secondary" className="mb-2">
-                              {user.mutualFriends} mutual friends
-                            </Badge>
-                          </div>
-                        )}
-
-                        {user.commonInterests.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-4">
-                            {user.commonInterests.map((interest, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
-                                {interest}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        {getFriendshipButton(user)}
-                        <Button variant="ghost" size="sm">
-                          View Profile
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <UserCard key={user.id} user={user} />
               ))}
             </div>
           ) : searchTerm.length > 2 ? (
@@ -408,6 +502,57 @@ export default function SmartFriendSearch() {
                 <h3 className="text-lg font-medium mb-2">Start searching</h3>
                 <p className="text-muted-foreground">
                   Enter at least 3 characters to search for users
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="suggestions" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Suggested connections</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadSuggestions}
+              disabled={loadingSuggestions}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {loadingSuggestions ? 'Refreshing…' : 'Refresh'}
+            </Button>
+          </div>
+
+          {loadingSuggestions ? (
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="h-16 w-16 bg-gray-300 rounded-full"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-gray-300 rounded w-1/3"></div>
+                        <div className="h-3 bg-gray-300 rounded w-1/2"></div>
+                        <div className="h-3 bg-gray-300 rounded w-2/3"></div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : filteredSuggestions.length > 0 ? (
+            <div className="space-y-4">
+              {filteredSuggestions.map((user) => (
+                <UserCard key={`suggestion-${user.id}`} user={user} />
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No suggestions just yet</h3>
+                <p className="text-muted-foreground">
+                  Check back later as we learn more about your watch history and friends.
                 </p>
               </CardContent>
             </Card>
