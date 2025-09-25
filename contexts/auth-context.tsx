@@ -32,7 +32,7 @@ interface AuthContextType {
   verifyEmail: (token: string) => Promise<void>
   resendVerification: () => Promise<void>
   socialLogin: (provider: "google" | "github") => Promise<void>
-  refreshToken: () => Promise<void>
+  refreshTokens: () => Promise<void>
   updateProfile: (data: Partial<User>) => Promise<void>
   updateUser: (userData: Partial<User>) => void
   refreshUser: () => Promise<void>
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isAuthenticated) {
       const interval = setInterval(
         () => {
-          refreshToken().catch(() => {
+          refreshTokens().catch(() => {
             // If refresh fails, logout user
             logout()
           })
@@ -248,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const refreshToken = async () => {
+  const refreshTokens = async () => {
     try {
       if (typeof window === 'undefined') {
         throw new Error("Cannot refresh token on server side")
@@ -325,7 +325,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     verifyEmail,
     resendVerification,
     socialLogin,
-    refreshToken,
+    refreshTokens,
     updateProfile,
     updateUser,
     refreshUser,

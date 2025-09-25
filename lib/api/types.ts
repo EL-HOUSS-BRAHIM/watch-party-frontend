@@ -39,6 +39,8 @@ export interface User {
   is_staff?: boolean
   is_superuser?: boolean
   isVerified?: boolean
+  isEmailVerified?: boolean
+  twoFactorEnabled?: boolean
   onboarding_completed?: boolean
 }
 
