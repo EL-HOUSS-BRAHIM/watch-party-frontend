@@ -10,6 +10,9 @@ import type {
   UserAnalytics,
   APIResponse,
   PaginatedResponse,
+  AnalyticsRealtimeSnapshot,
+  AnalyticsAdvancedQueryInput,
+  AnalyticsAdvancedQueryResponse,
 } from "./types"
 
 export class AnalyticsAPI {
@@ -160,24 +163,15 @@ export class AnalyticsAPI {
   /**
    * Get real-time analytics
    */
-  async getRealtimeAnalytics(): Promise<any> {
-    return apiClient.get(API_ENDPOINTS.analytics.realtime)
+  async getRealtimeAnalytics(): Promise<AnalyticsRealtimeSnapshot> {
+    return apiClient.get<AnalyticsRealtimeSnapshot>(API_ENDPOINTS.analytics.realtime)
   }
 
   /**
    * Execute advanced analytics query
    */
-  async executeAdvancedQuery(query: {
-    metrics: string[]
-    dimensions?: string[]
-    filters?: Record<string, any>
-    date_range?: {
-      start: string
-      end: string
-    }
-    granularity?: 'hour' | 'day' | 'week' | 'month'
-  }): Promise<any> {
-    return apiClient.post(API_ENDPOINTS.analytics.advancedQuery, query)
+  async executeAdvancedQuery(query: AnalyticsAdvancedQueryInput): Promise<AnalyticsAdvancedQueryResponse> {
+    return apiClient.post<AnalyticsAdvancedQueryResponse>(API_ENDPOINTS.analytics.advancedQuery, query)
   }
 
   /**
@@ -234,8 +228,8 @@ export class AnalyticsAPI {
   /**
    * Get real-time data
    */
-  async getRealTimeData(): Promise<any> {
-    return apiClient.get(API_ENDPOINTS.analytics.realTimeData)
+  async getRealTimeData(): Promise<AnalyticsRealtimeSnapshot> {
+    return apiClient.get<AnalyticsRealtimeSnapshot>(API_ENDPOINTS.analytics.realTimeData)
   }
 }
 

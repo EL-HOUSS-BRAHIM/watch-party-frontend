@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,7 +18,7 @@ import {
   CheckCircle,
   Filter
 } from 'lucide-react'
-import { useApi } from '@/hooks/use-api'
+import { integrationsAPI } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { LoadingSpinner } from '@/components/ui/loading'
 
@@ -62,7 +62,6 @@ export function GoogleDriveVideoBrowser({
   const [currentFolder, setCurrentFolder] = useState('root')
   const [folderPath, setFolderPath] = useState([{ id: 'root', name: 'My Drive' }])
   const [sortBy, setSortBy] = useState('modifiedTime')
-  const { get, post } = useApi()
   const { toast } = useToast()
 
   useEffect(() => {
@@ -72,15 +71,26 @@ export function GoogleDriveVideoBrowser({
   const fetchFiles = async () => {
     try {
       setIsLoading(true)
-      const response = await get('/integrations/google-drive/files/', {
-        params: {
-          parent: currentFolder,
-          mimeType: 'application/vnd.google-apps.folder,video/',
-          orderBy: sortBy,
-          pageSize: 100
-        }
+      const response = await integrationsAPI.getGoogleDriveFiles({
+        folder_id: currentFolder === 'root' ? undefined : currentFolder,
       })
-      setFiles(response.data.files || [])
+
+      const mappedFiles = (response.files || []).map(file => ({
+        id: file.id,
+        name: file.name,
+        mimeType: file.mime_type,
+        size: file.size,
+        createdTime: file.metadata?.created_at ?? new Date().toISOString(),
+        modifiedTime: file.metadata?.updated_at ?? new Date().toISOString(),
+        thumbnailLink: file.thumbnail,
+        webViewLink: file.url,
+        parents: file.metadata?.parents ?? ['root'],
+        owners: file.metadata?.owners ?? [],
+        duration: file.metadata?.duration,
+        videoMediaMetadata: file.metadata?.video,
+      })) as DriveFile[]
+
+      setFiles(mappedFiles)
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -130,8 +140,28 @@ export function GoogleDriveVideoBrowser({
     }
   }
 
-  const filteredFiles = files.filter(file => 
-    searchTerm === '' || 
+  const sortedFiles = useMemo(() => {
+    const next = [...files]
+
+    switch (sortBy) {
+      case 'name':
+        next.sort((a, b) => a.name.localeCompare(b.name))
+        break
+      case 'createdTime':
+        next.sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime())
+        break
+      case 'quotaBytesUsed':
+        next.sort((a, b) => (b.size || 0) - (a.size || 0))
+        break
+      default:
+        next.sort((a, b) => new Date(b.modifiedTime).getTime() - new Date(a.modifiedTime).getTime())
+    }
+
+    return next
+  }, [files, sortBy])
+
+  const filteredFiles = sortedFiles.filter(file =>
+    searchTerm === '' ||
     file.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 

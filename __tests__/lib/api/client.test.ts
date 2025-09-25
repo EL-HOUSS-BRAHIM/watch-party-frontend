@@ -1,5 +1,6 @@
 import axios from "axios"
 import jest from "jest" // Declare the jest variable
+import { environment } from "@/lib/config/env"
 
 jest.mock("axios")
 const mockedAxios = axios as jest.Mocked<typeof axios>
@@ -11,8 +12,8 @@ describe("API Client", () => {
 
   it("creates axios instance with correct config", () => {
     expect(mockedAxios.create).toHaveBeenCalledWith({
-      baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api",
-      timeout: 10000,
+      baseURL: environment.apiBaseUrl,
+      timeout: 30000,
       headers: {
         "Content-Type": "application/json",
       },

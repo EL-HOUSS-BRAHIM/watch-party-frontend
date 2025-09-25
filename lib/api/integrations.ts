@@ -6,10 +6,13 @@
 import { apiClient } from "./client"
 import { API_ENDPOINTS } from "./endpoints"
 import type {
-  IntegrationFile,
-  PresignedUpload,
-  HealthStatus,
   APIResponse,
+  HealthStatus,
+  IntegrationConnection,
+  IntegrationDefinition,
+  IntegrationFile,
+  IntegrationStatusOverview,
+  PresignedUpload,
 } from "./types"
 
 export class IntegrationsAPI {
@@ -35,6 +38,13 @@ export class IntegrationsAPI {
   }
 
   /**
+   * Complete Google Drive OAuth callback
+   */
+  async completeGoogleDriveOAuth(data: { code: string; state?: string }): Promise<APIResponse> {
+    return apiClient.post<APIResponse>(API_ENDPOINTS.integrations.googleDriveCallback, data)
+  }
+
+  /**
    * Get S3 presigned upload URL
    */
   async getS3PresignedUpload(data: {
@@ -49,7 +59,7 @@ export class IntegrationsAPI {
    * Get integration auth URL (generic)
    */
   async getAuthUrl(provider: string): Promise<{ auth_url: string }> {
-    return apiClient.get(API_ENDPOINTS.integrations.authUrl(provider))
+    return apiClient.get<{ auth_url: string }>(API_ENDPOINTS.integrations.authUrl(provider))
   }
 
   /**
@@ -68,6 +78,34 @@ export class IntegrationsAPI {
    */
   async getHealth(): Promise<HealthStatus> {
     return apiClient.get<HealthStatus>(API_ENDPOINTS.integrations.health)
+  }
+
+  /**
+   * Get integration status overview (admin + provider health)
+   */
+  async getStatus(): Promise<{ integrations: IntegrationStatusOverview[] }> {
+    return apiClient.get<{ integrations: IntegrationStatusOverview[] }>(API_ENDPOINTS.integrations.status)
+  }
+
+  /**
+   * Get available integration definitions
+   */
+  async getIntegrationTypes(): Promise<{ integrations: IntegrationDefinition[] }> {
+    return apiClient.get<{ integrations: IntegrationDefinition[] }>(API_ENDPOINTS.integrations.types)
+  }
+
+  /**
+   * Get the current user's connections
+   */
+  async getConnections(): Promise<{ connections: IntegrationConnection[] }> {
+    return apiClient.get<{ connections: IntegrationConnection[] }>(API_ENDPOINTS.integrations.connections)
+  }
+
+  /**
+   * Disconnect a specific integration connection
+   */
+  async disconnectConnection(connectionId: string): Promise<APIResponse> {
+    return apiClient.delete(API_ENDPOINTS.integrations.disconnectConnection(connectionId))
   }
 
   /**

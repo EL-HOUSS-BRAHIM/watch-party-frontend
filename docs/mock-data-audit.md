@@ -29,9 +29,11 @@ Based on the endpoint validation script results, the following areas still requi
 - **✅ RealTimeAnalytics**: Integrated with `analyticsAPI.getRealtimeAnalytics()` and `analyticsAPI.getRealTimeData()` to display live user counts, active streams, messaging metrics, and bandwidth usage with 30-second refresh intervals
 - **✅ PerformanceOptimizer**: Now uses `analyticsAPI.getSystemPerformance()` and `analyticsAPI.getDashboard()` to provide real server metrics (CPU, memory, response times), optimization suggestions, and bundle analysis data
 
-## Phase 5 – Admin Dashboards & Support Tooling (PENDING)  
+## Phase 5 – Admin Dashboards & Support Tooling (IN PROGRESS)
+- **✅** `app/admin/system/page.tsx` - Hydrates service health, metrics timelines, and log exports from admin and analytics APIs instead of locally generated telemetry.【F:app/admin/system/page.tsx†L1-L342】
+- **✅** `app/admin/analytics/advanced/page.tsx` - Pulls dashboard, realtime, and system analytics feeds for metrics, segments, devices, and activity heatmaps without mock fixtures.【F:app/admin/analytics/advanced/page.tsx†L1-L377】
+- **✅** `components/admin/faq-management.tsx` - Reads, creates, updates, reorders, and deletes FAQs through the support API so the admin console no longer depends on seeded arrays.【F:components/admin/faq-management.tsx†L1-L381】
 - `app/admin/chat/stats/page.tsx` - Mock chat totals and moderation activity
-- `components/admin/faq-management.tsx` - Local FAQ list and stats
 - `components/security/session-management.tsx` - Mock session lists and revoke flows
 - **✅** `components/groups/group-management-system.tsx` - Live social groups, membership rosters, and join/leave actions now flow through the social API client.【F:components/groups/group-management-system.tsx†L214-L438】
 
@@ -58,14 +60,11 @@ Based on the endpoint validation script results, the following areas still requi
 | `components/video/video-processing-pipeline.tsx` | Processing queues, tasks, and settings are hard-coded fixtures.【F:components/video/video-processing-pipeline.tsx†L92-L168】 | `videosAPI.getProcessingStatus`, `videosAPI.getProcessingJobs`【F:backend-api.json†L1551-L1591】 | Use video processing endpoints for job state, task progress, and output artifacts.
 | `components/performance/performance-optimizer.tsx` | Synthetic performance metrics, bundle stats, and history populate charts.【F:components/performance/performance-optimizer.tsx†L74-L193】 | `analyticsAPI.getSystemPerformance`, `analyticsAPI.getDashboard`【F:backend-api.json†L3174-L3237】 | Replace random metrics with analytics/system feeds to align with ops dashboards.
 | `components/monitoring/monitoring-dashboard.tsx` | Metrics, logs, alerts, and service health come from local arrays.【F:components/monitoring/monitoring-dashboard.tsx†L92-L219】 | `adminAPI.getSystemHealth`, `adminAPI.getLogs`, `analyticsAPI.getSystemAnalytics`【F:backend-api.json†L3174-L3198】【F:backend-api.json†L5227-L5266】 | Bind to the same admin telemetry used for system status pages.
-| `app/admin/system/page.tsx` | Historical charts are generated client-side instead of via health endpoints.【F:app/admin/system/page.tsx†L161-L188】 | `adminAPI.getSystemHealth`, `adminAPI.getLogs`【F:backend-api.json†L5227-L5266】 | Pull real CPU/memory/network history and reuse log export routes.
 | `components/deployment/deployment-pipeline.tsx` | Deployments, stages, and environments are mock arrays updated locally.【F:components/deployment/deployment-pipeline.tsx†L71-L198】 | `adminAPI.getDashboard`, `adminAPI.getAnalytics`【F:backend-api.json†L4966-L4989】 | Surface real deployment history and environment health from admin dashboards.
-| `app/admin/analytics/advanced/page.tsx` | Metrics, segments, regions, and device stats are fabricated.【F:app/admin/analytics/advanced/page.tsx†L52-L187】 | `analyticsAPI.getDashboard`, `analyticsAPI.postAdvancedQuery`【F:backend-api.json†L3200-L3284】 | Drive advanced analytics cards from dashboard and custom-query endpoints.
 
 ### Admin, Security & Support Tools
 | Location | Mock usage | Recommended API | Notes |
 | --- | --- | --- | --- |
-| `components/admin/faq-management.tsx` | FAQ list and stats are seeded locally on load.【F:components/admin/faq-management.tsx†L80-L154】 | `supportAPI.getFAQs`, `supportAPI.updateFAQ`, `supportAPI.voteFAQ`【F:backend-api.json†L4493-L4545】 | Hook CRUD, ordering, and voting to support FAQ endpoints.
 | `app/admin/chat/stats/page.tsx` | Chat totals, charts, and moderation activity are randomised datasets.【F:app/admin/chat/stats/page.tsx†L54-L92】 | `chatAPI.getPartyMessages`, `chatAPI.getActiveUsers`【F:backend-api.json†L2514-L2635】 | Fetch room analytics and moderation stats from chat endpoints.
 | `components/security/advanced-security-system.tsx` | Threats, rules, audit logs, and compliance reports are hard-coded.【F:components/security/advanced-security-system.tsx†L86-L220】 | `adminAPI.getSystemHealth`, `adminAPI.getLogs`, `adminAPI.getComplianceReports`【F:backend-api.json†L5227-L5266】 | Bind security dashboards to admin telemetry and compliance feeds.
 | `components/security/session-management.tsx` | Session list and revoke flows operate on mock sessions only.【F:components/security/session-management.tsx†L64-L151】 | `usersAPI.getSessions`, `usersAPI.deleteSession`, `usersAPI.revokeAllSessions`【F:backend-api.json†L846-L1215】 | Replace fixtures with real session management and destructive actions.
@@ -75,10 +74,10 @@ Based on the endpoint validation script results, the following areas still requi
 ### Integrations & External Services
 | Location | Mock usage | Recommended API | Notes |
 | --- | --- | --- | --- |
-| `components/integrations/google-drive-upload.tsx` | Folder tree, uploads, and progress are simulated on the client.【F:components/integrations/google-drive-upload.tsx†L67-L154】 | `integrationsAPI.getGoogleDriveFiles`, `integrationsAPI.getGoogleDriveAuthUrl`, `integrationsAPI.getGoogleDriveStreamingUrl`【F:backend-api.json†L3717-L3776】 | Mirror Google Drive auth, browsing, and upload flows via integrations endpoints.
-| `components/integrations/GoogleDriveUpload.tsx` | Mock file listings and upload timers stand in for Drive APIs.【F:components/integrations/GoogleDriveUpload.tsx†L108-L199】 | `integrationsAPI.getGoogleDriveFiles`, `integrationsAPI.getGoogleDriveAuthUrl`【F:backend-api.json†L3717-L3776】 | Consolidate with the shared Drive client once live data is wired.
-| `app/dashboard/settings/integrations/google-drive/page.tsx` | Sync status and folder listings are hard-coded.【F:app/dashboard/settings/integrations/google-drive/page.tsx†L25-L179】 | `integrationsAPI.getGoogleDriveFiles`, `integrationsAPI.getGoogleDriveAuthUrl`【F:backend-api.json†L3717-L3776】 | Drive the settings page from real Drive status, folders, and usage metrics.
-| `app/dashboard/settings/integrations/discord/page.tsx` | Connected account and server list are static mocks.【F:app/dashboard/settings/integrations/discord/page.tsx†L35-L188】 | `integrationsAPI.getAuthUrl('discord')`, `integrationsAPI.getHealth`【F:backend-api.json†L3694-L3733】 | Use generic OAuth + health endpoints to surface Discord connection state.
+| `components/integrations/google-drive-workspace.tsx` | ✅ Live Drive integration consolidates connection status, file browsing, and streaming links using `integrationsAPI` helpers.【F:components/integrations/google-drive-workspace.tsx†L1-L228】 | `integrationsAPI.getGoogleDriveAuthUrl`, `integrationsAPI.getGoogleDriveFiles`, `integrationsAPI.getGoogleDriveStreamingUrl`【F:backend-api.json†L3717-L3776】 | Shared workspace component replaces the mock upload implementations end-to-end.
+| `components/integrations/google-drive-video-browser.tsx` | ✅ Selector modal now fetches Drive files over HTTP and maps metadata instead of reading local fixtures.【F:components/integrations/google-drive-video-browser.tsx†L1-L247】 | `integrationsAPI.getGoogleDriveFiles`【F:backend-api.json†L3746-L3752】 | Consumers can rely on the Drive client without reimplementing mocks.
+| `app/dashboard/settings/integrations/google-drive/page.tsx` | ✅ Settings surface renders the shared workspace so connection state, search, and streaming links all reflect live data.【F:app/dashboard/settings/integrations/google-drive/page.tsx†L1-L20】 | `integrationsAPI.getGoogleDriveAuthUrl`, `integrationsAPI.getGoogleDriveFiles`【F:backend-api.json†L3717-L3752】 | Drives the Google Drive dashboard from real endpoints rather than `mockFolders`.
+| `app/dashboard/settings/integrations/discord/page.tsx` | ✅ Discord integration depends on `integrationsAPI` for OAuth URLs, health, and server metadata instead of mock fixtures.【F:app/dashboard/settings/integrations/discord/page.tsx†L1-L196】 | `integrationsAPI.getAuthUrl('discord')`, `integrationsAPI.getHealth`, `integrationsAPI.getConnections`【F:backend-api.json†L3694-L3852】 | OAuth status, refresh actions, and server listings all hydrate from live endpoints.
 
 ### Content, Localization & Engagement
 | Location | Mock usage | Recommended API | Notes |
@@ -88,7 +87,7 @@ Based on the endpoint validation script results, the following areas still requi
 | `components/billing/chat/typing-indicators.tsx` | Random typing users simulate presence instead of websocket/REST feeds.【F:components/billing/chat/typing-indicators.tsx†L21-L55】 | `chatAPI.getActiveUsers`, websocket presence【F:backend-api.json†L2514-L2635】 | Replace timers with room presence polling or socket subscriptions.
 
 ## Missing Client API Helpers (TODO)
-- [ ] Add a lightweight `DocsAPI` client to surface `/api/docs/` content alongside documentation management surfaces.【F:backend-api.json†L57-L92】
-- [ ] Introduce a `DashboardAPI` wrapper for `/api/dashboard/activities/` so activity summaries can be reused outside the friends feed.【F:backend-api.json†L140-L167】
-- [ ] Extend `analyticsAPI` with helpers for `/api/analytics/dashboard/realtime/` and `/api/analytics/advanced/query/` to support the remaining dashboards.【F:backend-api.json†L3200-L3284】
-- [ ] Plan a `LocalizationAPI` once translation endpoints are defined, covering language status, strings, and approvals.【F:components/i18n/multi-language-system.tsx†L103-L218】
+- [x] Add a lightweight `DocsAPI` client to surface `/api/docs/` content alongside documentation management surfaces.【F:lib/api/docs.ts†L1-L128】
+- [x] Introduce a `DashboardAPI` wrapper for `/api/dashboard/activities/` so activity summaries can be reused outside the friends feed.【F:lib/api/dashboard.ts†L1-L54】
+- [x] Extend `analyticsAPI` with helpers for `/api/analytics/dashboard/realtime/` and `/api/analytics/advanced/query/` to support the remaining dashboards.【F:lib/api/analytics.ts†L1-L244】
+- [x] Plan a `LocalizationAPI` once translation endpoints are defined, covering language status, strings, and approvals.【F:lib/api/localization.ts†L1-L97】

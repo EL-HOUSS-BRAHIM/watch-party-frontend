@@ -1,522 +1,262 @@
 'use client'
 
-import { useState } from 'react'
-import { 
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  ChatBubbleLeftRightIcon,
   MicrophoneIcon,
-  SpeakerWaveIcon,
-  SpeakerXMarkIcon,
-  VideoCameraIcon,
-  VideoCameraSlashIcon,
-  Cog6ToothIcon,
-  DevicePhoneMobileIcon,
-  ComputerDesktopIcon,
-  CheckCircleIcon,
-  XCircleIcon,
   ArrowPathIcon,
-  InformationCircleIcon
+  CheckCircleIcon,
+  XMarkIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
-
-interface DiscordUser {
-  id: string
-  username: string
-  discriminator: string
-  avatar: string
-  status: 'online' | 'away' | 'dnd' | 'offline'
-}
+import { integrationsAPI } from '@/lib/api'
+import type { HealthStatus, IntegrationConnection } from '@/lib/api'
+import { useToast } from '@/hooks/use-toast'
+import { LoadingSpinner } from '@/components/ui/loading'
 
 interface DiscordServer {
   id: string
   name: string
-  icon: string
-  memberCount: number
-  isConnected: boolean
-}
-
-const mockUser: DiscordUser = {
-  id: '123456789',
-  username: 'WatchPartyUser',
-  discriminator: '1234',
-  avatar: '/placeholder-user.jpg',
-  status: 'online'
-}
-
-const mockServers: DiscordServer[] = [
-  {
-    id: '1',
-    name: 'WatchParty Community',
-    icon: '/placeholder-logo.svg',
-    memberCount: 1523,
-    isConnected: true
-  },
-  {
-    id: '2',
-    name: 'Movie Nights',
-    icon: '/placeholder.svg',
-    memberCount: 89,
-    isConnected: true
-  },
-  {
-    id: '3',
-    name: 'Gaming Squad',
-    icon: '/placeholder.svg',
-    memberCount: 42,
-    isConnected: false
-  }
-]
-
-interface NotificationSettings {
-  partyInvites: boolean
-  friendRequests: boolean
-  watchReminders: boolean
-  systemUpdates: boolean
+  member_count?: number
+  is_connected?: boolean
 }
 
 export default function DiscordIntegrationPage() {
-  const [isConnected, setIsConnected] = useState(true)
-  const [richPresence, setRichPresence] = useState(true)
-  const [voiceIntegration, setVoiceIntegration] = useState(true)
-  const [autoJoinVoice, setAutoJoinVoice] = useState(false)
-  const [showActivity, setShowActivity] = useState(true)
-  const [notifications, setNotifications] = useState<NotificationSettings>({
-    partyInvites: true,
-    friendRequests: true,
-    watchReminders: false,
-    systemUpdates: true
-  })
-  const [showDisconnectModal, setShowDisconnectModal] = useState(false)
-  const [isReconnecting, setIsReconnecting] = useState(false)
+  const [connection, setConnection] = useState<IntegrationConnection | null>(null)
+  const [health, setHealth] = useState<HealthStatus | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [action, setAction] = useState<'connect' | 'disconnect' | 'refresh' | null>(null)
+  const { toast } = useToast()
 
-  const handleDisconnect = () => {
-    setIsConnected(false)
-    setShowDisconnectModal(false)
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [connectionsResponse, healthResponse] = await Promise.all([
+        integrationsAPI.getConnections(),
+        integrationsAPI.getHealth().catch(() => null),
+      ])
+      const discordConnection = connectionsResponse.connections?.find(
+        (item) => item.provider === 'discord'
+      )
+      setConnection(discordConnection ?? null)
+      setHealth(healthResponse)
+    } catch (error) {
+      console.error('Failed to load Discord integration', error)
+      toast({
+        title: 'Unable to load Discord integration',
+        description: 'Check your network connection and try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+      setAction(null)
+    }
+  }, [toast])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  const servers: DiscordServer[] = useMemo(() => {
+    const rawServers = (connection?.metadata?.servers as DiscordServer[] | undefined) ?? []
+    return rawServers
+  }, [connection])
+
+  const handleConnect = async () => {
+    setAction('connect')
+    try {
+      const { auth_url } = await integrationsAPI.getAuthUrl('discord')
+      window.location.assign(auth_url)
+    } catch (error) {
+      console.error('Failed to start Discord OAuth', error)
+      toast({
+        title: 'Connection failed',
+        description: 'We were unable to start the Discord authorization flow.',
+        variant: 'destructive',
+      })
+      setAction(null)
+    }
   }
 
-  const handleReconnect = async () => {
-    setIsReconnecting(true)
-    // Simulate OAuth reconnection
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setIsConnected(true)
-    setIsReconnecting(false)
+  const handleDisconnect = async () => {
+    if (!connection) return
+
+    setAction('disconnect')
+    try {
+      await integrationsAPI.disconnectConnection(connection.id)
+      toast({
+        title: 'Discord disconnected',
+        description: 'The integration has been removed from your account.',
+      })
+      await loadData()
+    } catch (error) {
+      console.error('Failed to disconnect Discord', error)
+      toast({
+        title: 'Unable to disconnect',
+        description: 'We could not disconnect the Discord integration. Try again later.',
+        variant: 'destructive',
+      })
+      setAction(null)
+    }
   }
 
-  const updateNotificationSetting = (key: keyof NotificationSettings) => {
-    setNotifications(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }))
+  const handleRefresh = async () => {
+    setAction('refresh')
+    await loadData()
   }
 
-  if (!isConnected) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-        <div className="max-w-4xl mx-auto px-4 py-12">
-          <div className="text-center">
-            <div className="inline-flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
-                <MicrophoneIcon className="w-5 h-5 text-white" />
-              </div>
-              <h1 className="text-4xl font-bold text-white">Discord</h1>
-            </div>
-            
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-12 border border-white/20">
-              <XCircleIcon className="w-16 h-16 text-red-400 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-4">Not Connected</h2>
-              <p className="text-white/70 mb-8 max-w-md mx-auto">
-                Connect your Discord account to show your watch parties in your status and enable voice chat integration.
-              </p>
-              
-              <div className="space-y-4 mb-8">
-                <div className="flex items-center gap-3 text-white/80">
-                  <CheckCircleIcon className="w-5 h-5 text-green-400" />
-                  <span>Rich presence in Discord status</span>
-                </div>
-                <div className="flex items-center gap-3 text-white/80">
-                  <CheckCircleIcon className="w-5 h-5 text-green-400" />
-                  <span>Voice chat integration</span>
-                </div>
-                <div className="flex items-center gap-3 text-white/80">
-                  <CheckCircleIcon className="w-5 h-5 text-green-400" />
-                  <span>Party notifications</span>
-                </div>
-              </div>
-              
-              <button
-                onClick={handleReconnect}
-                disabled={isReconnecting}
-                className="bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-500/50 text-white px-8 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 mx-auto"
-              >
-                {isReconnecting ? (
-                  <>
-                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  'Connect Discord'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const healthMessage = useMemo(() => {
+    if (!health) return 'Discord service status is currently unavailable.'
+    const discordService = health.services?.find((service) => service.name === 'discord')
+    if (!discordService) return 'Discord health information is not available from the status endpoint.'
+    return discordService.status === 'up'
+      ? 'Discord integrations are operational.'
+      : 'Discord integrations are reporting issues.'
+  }, [health])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="max-w-6xl mx-auto px-4 py-12">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-12">
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
-                <MicrophoneIcon className="w-5 h-5 text-white" />
-              </div>
-              <h1 className="text-4xl font-bold text-white">Discord Integration</h1>
-            </div>
-            <p className="text-white/70 text-lg">
-              Manage your Discord connection and integration settings
-            </p>
+      <div className="max-w-5xl mx-auto px-4 py-12 space-y-8">
+        <header className="space-y-4">
+          <div className="flex items-center gap-3">
+            <ChatBubbleLeftRightIcon className="w-8 h-8 text-indigo-300" />
+            <h1 className="text-4xl font-bold text-white">Discord Integration</h1>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <CheckCircleIcon className="w-6 h-6 text-green-400" />
-            <span className="text-green-400 font-medium">Connected</span>
+          <p className="text-white/70 text-lg max-w-3xl">
+            Connect Discord to share party updates, synchronize voice channels, and broadcast what you are watching to your
+            community in real time.
+          </p>
+        </header>
+
+        {loading ? (
+          <div className="flex items-center gap-3 text-white/70">
+            <LoadingSpinner /> Loading Discord data…
           </div>
-        </div>
-
-        {/* Connected Account */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 mb-8">
-          <h3 className="text-lg font-bold text-white mb-4">Connected Account</h3>
-          
-          <div className="flex items-center gap-4 mb-6">
-            <img
-              src={mockUser.avatar}
-              alt="Discord Avatar"
-              className="w-16 h-16 rounded-full bg-white/20"
-            />
-            <div>
-              <h4 className="text-xl font-bold text-white">
-                {mockUser.username}#{mockUser.discriminator}
-              </h4>
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${
-                  mockUser.status === 'online' ? 'bg-green-400' :
-                  mockUser.status === 'away' ? 'bg-yellow-400' :
-                  mockUser.status === 'dnd' ? 'bg-red-400' : 'bg-gray-400'
-                }`}></div>
-                <span className="text-white/70 capitalize">{mockUser.status}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white/5 rounded-lg p-4">
-              <h5 className="font-medium text-white mb-2">Connected Servers</h5>
-              <div className="text-2xl font-bold text-indigo-400">
-                {mockServers.filter(s => s.isConnected).length}
-              </div>
-              <div className="text-sm text-white/60">of {mockServers.length} servers</div>
-            </div>
-            
-            <div className="bg-white/5 rounded-lg p-4">
-              <h5 className="font-medium text-white mb-2">Total Members</h5>
-              <div className="text-2xl font-bold text-indigo-400">
-                {mockServers.reduce((sum, s) => sum + (s.isConnected ? s.memberCount : 0), 0)}
-              </div>
-              <div className="text-sm text-white/60">across connected servers</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Integration Settings */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
-            <h3 className="text-lg font-bold text-white mb-4">Integration Features</h3>
-            
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-white">Rich Presence</h4>
-                  <p className="text-sm text-white/60">Show what you're watching in Discord</p>
-                </div>
-                <button
-                  onClick={() => setRichPresence(!richPresence)}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    richPresence ? 'bg-indigo-500' : 'bg-white/20'
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      richPresence ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  ></div>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-white">Voice Integration</h4>
-                  <p className="text-sm text-white/60">Enable Discord voice chat in parties</p>
-                </div>
-                <button
-                  onClick={() => setVoiceIntegration(!voiceIntegration)}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    voiceIntegration ? 'bg-indigo-500' : 'bg-white/20'
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      voiceIntegration ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  ></div>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-white">Auto-join Voice</h4>
-                  <p className="text-sm text-white/60">Automatically join voice when party starts</p>
-                </div>
-                <button
-                  onClick={() => setAutoJoinVoice(!autoJoinVoice)}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    autoJoinVoice ? 'bg-indigo-500' : 'bg-white/20'
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      autoJoinVoice ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  ></div>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-white">Show Activity</h4>
-                  <p className="text-sm text-white/60">Let friends see when you're watching</p>
-                </div>
-                <button
-                  onClick={() => setShowActivity(!showActivity)}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    showActivity ? 'bg-indigo-500' : 'bg-white/20'
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      showActivity ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  ></div>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
-            <h3 className="text-lg font-bold text-white mb-4">Notification Settings</h3>
-            
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-white">Party Invites</h4>
-                  <p className="text-sm text-white/60">Get notified of party invitations</p>
-                </div>
-                <button
-                  onClick={() => updateNotificationSetting('partyInvites')}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    notifications.partyInvites ? 'bg-indigo-500' : 'bg-white/20'
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      notifications.partyInvites ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  ></div>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-white">Friend Requests</h4>
-                  <p className="text-sm text-white/60">Get notified of new friend requests</p>
-                </div>
-                <button
-                  onClick={() => updateNotificationSetting('friendRequests')}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    notifications.friendRequests ? 'bg-indigo-500' : 'bg-white/20'
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      notifications.friendRequests ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  ></div>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-white">Watch Reminders</h4>
-                  <p className="text-sm text-white/60">Reminders for scheduled parties</p>
-                </div>
-                <button
-                  onClick={() => updateNotificationSetting('watchReminders')}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    notifications.watchReminders ? 'bg-indigo-500' : 'bg-white/20'
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      notifications.watchReminders ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  ></div>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-white">System Updates</h4>
-                  <p className="text-sm text-white/60">Important system notifications</p>
-                </div>
-                <button
-                  onClick={() => updateNotificationSetting('systemUpdates')}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    notifications.systemUpdates ? 'bg-indigo-500' : 'bg-white/20'
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      notifications.systemUpdates ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  ></div>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Connected Servers */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 overflow-hidden mb-8">
-          <div className="p-6 border-b border-white/10">
-            <h3 className="text-lg font-bold text-white">Connected Servers</h3>
-          </div>
-          
-          <div className="divide-y divide-white/10">
-            {mockServers.map(server => (
-              <div key={server.id} className="p-4 hover:bg-white/5 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={server.icon}
-                      alt={server.name}
-                      className="w-12 h-12 rounded-lg bg-white/20"
-                    />
-                    
-                    <div>
-                      <h4 className="font-medium text-white">{server.name}</h4>
-                      <div className="text-sm text-white/60">
-                        {server.memberCount.toLocaleString()} members
+        ) : (
+          <div className="space-y-8">
+            <section
+              className="rounded-xl border border-white/10 bg-white/10 p-6 text-white shadow-sm backdrop-blur"
+              data-testid="discord-connection-card"
+            >
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-semibold">Connection status</h2>
+                  <p className="text-white/70">{healthMessage}</p>
+                  {connection ? (
+                    <div className="rounded-lg border border-green-400/40 bg-green-400/10 px-4 py-3 text-sm">
+                      <p className="font-medium">Connected as {connection.account_email ?? connection.display_name}</p>
+                      {connection.connected_at && (
+                        <p className="text-white/70">
+                          Connected on {new Date(connection.connected_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-yellow-400/40 bg-yellow-400/10 px-4 py-3 text-sm">
+                      <p className="font-medium">Discord is not connected.</p>
+                      <p className="text-white/70">Start the OAuth flow to grant Watch Party the necessary permissions.</p>
+                    </div>
+                  )}
+                  {connection?.last_error && (
+                    <div className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm">
+                      <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-none" />
+                      <div>
+                        <p className="font-medium">Integration error</p>
+                        <p className="text-white/70">{connection.last_error}</p>
                       </div>
                     </div>
-                  </div>
+                  )}
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    {server.isConnected ? (
-                      <div className="flex items-center gap-1 text-green-400">
-                        <CheckCircleIcon className="w-4 h-4" />
-                        <span className="text-sm">Connected</span>
-                      </div>
+                <div className="flex flex-col items-end gap-3">
+                  <button
+                    type="button"
+                    onClick={handleRefresh}
+                    disabled={action === 'refresh'}
+                    className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    data-testid="discord-refresh"
+                  >
+                    {action === 'refresh' ? (
+                      <>
+                        <ArrowPathIcon className="h-4 w-4 animate-spin" /> Refreshing…
+                      </>
                     ) : (
-                      <button className="px-3 py-1 bg-indigo-500 hover:bg-indigo-600 text-white text-sm rounded-lg transition-colors">
-                        Connect
-                      </button>
+                      <>
+                        <ArrowPathIcon className="h-4 w-4" /> Refresh
+                      </>
                     )}
-                  </div>
+                  </button>
+                  {connection ? (
+                    <button
+                      type="button"
+                      onClick={handleDisconnect}
+                      disabled={action === 'disconnect'}
+                      className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                      data-testid="discord-disconnect"
+                    >
+                      {action === 'disconnect' ? (
+                        <>
+                          <ArrowPathIcon className="h-4 w-4 animate-spin" /> Disconnecting…
+                        </>
+                      ) : (
+                        <>
+                          <XMarkIcon className="h-4 w-4" /> Disconnect
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleConnect}
+                      disabled={action === 'connect'}
+                      className="inline-flex items-center gap-2 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
+                      data-testid="discord-connect"
+                    >
+                      {action === 'connect' ? (
+                        <>
+                          <ArrowPathIcon className="h-4 w-4 animate-spin" /> Redirecting…
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircleIcon className="h-4 w-4" /> Connect Discord
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
+            </section>
 
-        {/* Voice Settings */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 mb-8">
-          <h3 className="text-lg font-bold text-white mb-4">Voice Chat Settings</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-medium text-white mb-2">Input Device</h4>
-              <select className="w-full px-3 py-2 bg-white/10 rounded-lg border border-white/20 text-white focus:outline-none focus:border-indigo-400">
-                <option>Default Microphone</option>
-                <option>USB Headset Microphone</option>
-                <option>Blue Yeti Microphone</option>
-              </select>
-            </div>
-            
-            <div>
-              <h4 className="font-medium text-white mb-2">Output Device</h4>
-              <select className="w-full px-3 py-2 bg-white/10 rounded-lg border border-white/20 text-white focus:outline-none focus:border-indigo-400">
-                <option>Default Speakers</option>
-                <option>USB Headset</option>
-                <option>Bluetooth Headphones</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="flex gap-4 mb-8">
-          <button className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-lg font-medium transition-colors">
-            <Cog6ToothIcon className="w-5 h-5" />
-            Advanced Settings
-          </button>
-          
-          <button
-            onClick={() => setShowDisconnectModal(true)}
-            className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-          >
-            <XCircleIcon className="w-5 h-5" />
-            Disconnect
-          </button>
-        </div>
-
-        {/* Info Notice */}
-        <div className="bg-indigo-500/20 border border-indigo-500/50 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <InformationCircleIcon className="w-5 h-5 text-indigo-400 mt-0.5" />
-            <div>
-              <h4 className="font-semibold text-indigo-300 mb-1">About Discord Integration</h4>
-              <p className="text-indigo-200 text-sm">
-                WatchParty integrates with Discord to enhance your social viewing experience. We only access 
-                basic profile information and server membership to provide integration features.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Disconnect Confirmation Modal */}
-        {showDisconnectModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
-              <h2 className="text-xl font-bold text-white mb-4">Disconnect Discord?</h2>
-              <p className="text-white/70 mb-6">
-                This will disable Discord integration features like rich presence, voice chat, 
-                and notifications. You can reconnect at any time.
-              </p>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setShowDisconnectModal(false)}
-                  className="flex-1 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDisconnect}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  Disconnect
-                </button>
-              </div>
-            </div>
+            <section className="rounded-xl border border-white/10 bg-white/10 p-6 text-white shadow-sm backdrop-blur">
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <MicrophoneIcon className="w-5 h-5" /> Connected servers
+              </h2>
+              {servers.length === 0 ? (
+                <p className="text-white/70 text-sm">
+                  No Discord servers are linked to this integration yet. Once connected, select servers and channels from the
+                  authorization prompt.
+                </p>
+              ) : (
+                <ul className="space-y-3" data-testid="discord-server-list">
+                  {servers.map((server) => (
+                    <li
+                      key={server.id}
+                      className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-3"
+                    >
+                      <div>
+                        <p className="font-medium">{server.name}</p>
+                        {typeof server.member_count === 'number' && (
+                          <p className="text-sm text-white/70">{server.member_count} members</p>
+                        )}
+                      </div>
+                      <span className={server.is_connected ? 'text-green-300' : 'text-yellow-300'}>
+                        {server.is_connected ? 'Notifications enabled' : 'Not enabled'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
         )}
       </div>

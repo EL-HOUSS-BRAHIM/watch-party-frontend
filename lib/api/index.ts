@@ -27,6 +27,9 @@ export { InteractiveAPI } from "./interactive"
 export { ModerationAPI } from "./moderation"
 export { IntegrationsAPI } from "./integrations"
 export { EventsAPI } from "./events"
+export { DocsAPI } from "./docs"
+export { DashboardAPI } from "./dashboard"
+export { LocalizationAPI } from "./localization"
 
 // Import types for proxy typing
 import type { AuthAPI } from "./auth"
@@ -48,6 +51,9 @@ import type { InteractiveAPI } from "./interactive"
 import type { ModerationAPI } from "./moderation"
 import type { IntegrationsAPI } from "./integrations"
 import type { EventsAPI } from "./events"
+import type { DocsAPI } from "./docs"
+import type { DashboardAPI } from "./dashboard"
+import type { LocalizationAPI } from "./localization"
 
 // Lazy-loaded API instances
 let _authAPI: any = null
@@ -69,6 +75,9 @@ let _interactiveAPI: any = null
 let _moderationAPI: any = null
 let _integrationsAPI: any = null
 let _eventsAPI: any = null
+let _docsAPI: any = null
+let _dashboardAPI: any = null
+let _localizationAPI: any = null
 
 function getAuthAPI() {
   if (!_authAPI && typeof window !== 'undefined') {
@@ -222,6 +231,30 @@ function getEventsAPI() {
   return _eventsAPI
 }
 
+function getDocsAPI() {
+  if (!_docsAPI && typeof window !== 'undefined') {
+    const { DocsAPI } = require("./docs")
+    _docsAPI = new DocsAPI()
+  }
+  return _docsAPI
+}
+
+function getDashboardAPI() {
+  if (!_dashboardAPI && typeof window !== 'undefined') {
+    const { DashboardAPI } = require("./dashboard")
+    _dashboardAPI = new DashboardAPI()
+  }
+  return _dashboardAPI
+}
+
+function getLocalizationAPI() {
+  if (!_localizationAPI && typeof window !== 'undefined') {
+    const { LocalizationAPI } = require("./localization")
+    _localizationAPI = new LocalizationAPI()
+  }
+  return _localizationAPI
+}
+
 // Export lazy-loaded instances with proper typing
 export const authAPI = new Proxy({} as AuthAPI, {
   get(target, prop) {
@@ -356,6 +389,27 @@ export const eventsAPI = new Proxy({} as EventsAPI, {
   }
 })
 
+export const docsAPI = new Proxy({} as DocsAPI, {
+  get(target, prop) {
+    const api = getDocsAPI()
+    return api?.[prop]
+  }
+})
+
+export const dashboardAPI = new Proxy({} as DashboardAPI, {
+  get(target, prop) {
+    const api = getDashboardAPI()
+    return api?.[prop]
+  }
+})
+
+export const localizationAPI = new Proxy({} as LocalizationAPI, {
+  get(target, prop) {
+    const api = getLocalizationAPI()
+    return api?.[prop]
+  }
+})
+
 // Types
 export type * from "./types"
 
@@ -380,4 +434,7 @@ export const api = {
   moderation: moderationAPI,
   integrations: integrationsAPI,
   events: eventsAPI,
+  docs: docsAPI,
+  dashboard: dashboardAPI,
+  localization: localizationAPI,
 } as const

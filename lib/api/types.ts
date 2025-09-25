@@ -185,6 +185,275 @@ export interface DiscoverContent {
   platform_stats?: Record<string, any>
 }
 
+// Dashboard Types
+export interface DashboardStatsSummary {
+  user: {
+    id: string
+    name: string
+    email: string
+  }
+  stats: {
+    total_parties: number
+    recent_parties: number
+    total_videos: number
+    recent_videos: number
+    watch_time_minutes: number
+  }
+  trends?: Record<string, number | Record<string, number>>
+  timestamp: string
+}
+
+export interface DashboardActivity {
+  id: string
+  type: string
+  timestamp: string
+  status?: "unread" | "read" | "dismissed"
+  actor?: {
+    id: string
+    name: string
+    avatar?: string | null
+  }
+  party?: {
+    id: string
+    title: string
+  }
+  video?: {
+    id: string
+    title: string
+  }
+  data?: Record<string, any>
+}
+
+export interface DashboardActivityAcknowledgePayload {
+  status: "read" | "dismissed"
+  note?: string
+}
+
+// Documentation Types
+export type DocumentationStatus = "draft" | "review" | "published" | "archived"
+export type DocumentationType = "guide" | "api" | "tutorial" | "reference" | "changelog"
+
+export interface DocumentationCategory {
+  id: string
+  slug: string
+  name: string
+  description?: string
+  color?: string
+  document_count: number
+}
+
+export interface DocumentationDocument {
+  id: string
+  slug: string
+  title: string
+  summary?: string
+  type: DocumentationType
+  status: DocumentationStatus
+  category: DocumentationCategory
+  tags: string[]
+  author: {
+    id: string
+    name: string
+    avatar?: string | null
+  }
+  content: string
+  created_at: string
+  updated_at: string
+  version: string
+  view_count?: number
+  metadata?: Record<string, any>
+}
+
+export interface DocumentationVersion {
+  id: string
+  version: string
+  status: DocumentationStatus
+  created_at: string
+  created_by: {
+    id: string
+    name: string
+  }
+  changelog?: string
+}
+
+export interface DocumentationUpsertInput {
+  title: string
+  content: string
+  category: string
+  status?: DocumentationStatus
+  summary?: string
+  tags?: string[]
+  type?: DocumentationType
+  metadata?: Record<string, any>
+}
+
+export interface DocumentationCategoryInput {
+  name: string
+  description?: string
+  color?: string
+  slug?: string
+}
+
+export interface DocumentationListFilters {
+  search?: string
+  status?: DocumentationStatus
+  category?: string
+  tags?: string[]
+  author?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface DocumentationSearchResult {
+  id: string
+  title: string
+  summary: string
+  path: string
+  relevance: number
+  highlights?: Record<string, string[]>
+}
+
+// Localization Types
+export interface LocalizationLanguage {
+  code: string
+  name: string
+  native_name: string
+  progress: number
+  strings_total: number
+  strings_translated: number
+  reviewers?: Array<{ id: string; name: string }>
+  updated_at: string
+}
+
+export interface LocalizationProjectLanguage {
+  code: string
+  status: "draft" | "in_review" | "complete"
+  completion: number
+  reviewers: Array<{ id: string; name: string }>
+}
+
+export interface LocalizationProject {
+  id: string
+  slug: string
+  name: string
+  description?: string
+  languages: LocalizationProjectLanguage[]
+  owner?: { id: string; name: string }
+  updated_at: string
+  created_at: string
+}
+
+export type LocalizationStringStatus = "draft" | "in_review" | "approved" | "rejected"
+
+export interface LocalizationStringTranslation {
+  language: string
+  text: string
+  status: LocalizationStringStatus
+  updated_at: string
+  updated_by?: { id: string; name: string }
+  feedback?: string
+}
+
+export interface LocalizationString {
+  id: string
+  key: string
+  context?: string
+  description?: string
+  screenshots?: string[]
+  source_text: string
+  status: LocalizationStringStatus
+  translations: LocalizationStringTranslation[]
+  metadata?: Record<string, any>
+  updated_at: string
+}
+
+export interface LocalizationSubmissionPayload {
+  key: string
+  language: string
+  translation: string
+  context?: string
+  metadata?: Record<string, any>
+}
+
+export interface LocalizationApproval {
+  id: string
+  string_id: string
+  language: string
+  status: LocalizationStringStatus
+  assigned_to: { id: string; name: string }
+  submitted_at: string
+  updated_at: string
+  notes?: string
+}
+
+// Analytics Types (extended for Phase 1)
+export interface AnalyticsRealtimeUser {
+  id: string
+  username: string
+  location?: string
+  device_type?: string
+  current_activity?: string
+  current_room_id?: string
+  session_start?: string
+}
+
+export interface AnalyticsRealtimeRoom {
+  id: string
+  name: string
+  viewer_count: number
+  max_viewers?: number
+  duration_seconds?: number
+  video?: {
+    id?: string
+    title?: string
+    duration?: number
+    current_time?: number
+  }
+}
+
+export interface AnalyticsRealtimeSeriesPoint {
+  timestamp: string
+  active_users: number
+  concurrent_streams: number
+  messages_per_minute: number
+  bandwidth_tb_per_hour: number
+}
+
+export interface AnalyticsRealtimeSnapshot {
+  active_users: number
+  concurrent_streams: number
+  messages_per_minute: number
+  bandwidth_usage: number
+  user_growth_rate?: number
+  stream_growth_rate?: number
+  chat_activity_rate?: number
+  bandwidth_growth_rate?: number
+  live_users?: AnalyticsRealtimeUser[]
+  active_rooms?: AnalyticsRealtimeRoom[]
+  geo_distribution?: Array<{ country: string; users: number }>
+  device_breakdown?: Array<{ device: string; percentage: number }>
+  time_series?: AnalyticsRealtimeSeriesPoint[]
+}
+
+export interface AnalyticsAdvancedQueryInput {
+  metrics: string[]
+  dimensions?: string[]
+  filters?: Record<string, any>
+  date_range?: {
+    start: string
+    end: string
+  }
+  granularity?: "hour" | "day" | "week" | "month"
+  limit?: number
+  order_by?: string[]
+}
+
+export interface AnalyticsAdvancedQueryResponse {
+  columns: string[]
+  rows: Array<Record<string, any>>
+  metadata?: Record<string, any>
+}
+
 // Social Types
 export interface SocialGroupMembership {
   role?: 'owner' | 'admin' | 'moderator' | 'member'
@@ -423,6 +692,38 @@ export interface IntegrationFile {
   mime_type: string
   url: string
   thumbnail?: string
+  metadata?: Record<string, any>
+}
+
+export interface IntegrationDefinition {
+  id: string
+  provider: string
+  name: string
+  description: string
+  capabilities: string[]
+  categories?: string[]
+  icon?: string
+  scopes?: string[]
+}
+
+export interface IntegrationConnection {
+  id: string
+  provider: string
+  display_name: string
+  status: 'connected' | 'pending' | 'error'
+  connected_at?: string
+  account_email?: string
+  permissions?: string[]
+  expires_at?: string
+  last_error?: string | null
+  metadata?: Record<string, any>
+}
+
+export interface IntegrationStatusOverview {
+  provider: string
+  status: 'available' | 'degraded' | 'unavailable'
+  last_checked_at?: string
+  issues?: string[]
 }
 
 export interface PresignedUpload {
