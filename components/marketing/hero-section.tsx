@@ -35,6 +35,20 @@ export function HeroSection({ isAuthenticated, stats }: HeroSectionProps) {
       label: "Start Watching Free",
       icon: Users,
     }
+  }, [isAuthenticated])
+
+  const secondaryCta = useMemo<CtaConfig | null>(() => {
+    if (isAuthenticated) {
+      return null
+    }
+
+    return {
+      href: "/login",
+      label: "Sign In",
+      icon: Eye,
+    }
+  }, [isAuthenticated])
+
   const PrimaryIcon = primaryCta.icon
 
   return (

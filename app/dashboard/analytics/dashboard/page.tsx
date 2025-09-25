@@ -98,10 +98,10 @@ export default function AdminAnalyticsDashboard() {
           avgSessionDuration: (dashboardData.overview as any)?.avg_session_duration || dashboardData.overview?.total_watch_time_hours || 0,
         },
         trends: {
-          userGrowth: advancedData.trends?.user_growth || [],
-          revenueGrowth: advancedData.trends?.revenue_growth || [],
-          contentMetrics: advancedData.trends?.content_metrics || [],
-          partyMetrics: advancedData.trends?.party_metrics || [],
+          userGrowth: (advancedData as any).trends?.user_growth || [],
+          revenueGrowth: (advancedData as any).trends?.revenue_growth || [],
+          contentMetrics: (advancedData as any).trends?.content_metrics || [],
+          partyMetrics: (advancedData as any).trends?.party_metrics || [],
         },
         demographics: {
           ageGroups: (dashboardData as any).demographics?.age_groups || (advancedData as any).demographics?.age_groups || [],

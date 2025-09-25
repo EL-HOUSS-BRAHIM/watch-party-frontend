@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { integrationsAPI } from '@/lib/api/integrations'
+import { integrationsAPI } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { 
   FilmIcon,
