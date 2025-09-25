@@ -183,7 +183,7 @@ export default function SmartFriendSearch() {
     try {
       const params = buildSearchParams(searchTerm, filters);
       const response = await usersAPI.searchUsers(params);
-      const results = Array.isArray(response?.results) ? response.results : response?.users ?? [];
+      const results = response?.results ?? [];
       setUsers(results.map((result: any) => normalizeSearchUser(result)));
     } catch (error) {
       console.error('Failed to search users:', error);

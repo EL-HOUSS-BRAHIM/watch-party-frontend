@@ -76,8 +76,8 @@ export function DashboardHeader() {
               <Avatar className="h-10 w-10">
                 <AvatarImage src={user?.avatar || "/placeholder.svg"} />
                 <AvatarFallback>
-                  {user?.first_name?.[0]}
-                  {user?.last_name?.[0]}
+                  {user?.firstName?.[0]}
+                  {user?.lastName?.[0]}
                 </AvatarFallback>
               </Avatar>
               {user?.is_premium && <Crown className="absolute -top-1 -right-1 w-4 h-4 text-accent-premium" />}
@@ -88,7 +88,7 @@ export function DashboardHeader() {
               <div className="flex flex-col space-y-1">
                 <div className="flex items-center space-x-2">
                   <p className="text-sm font-medium leading-none">
-                    {user?.first_name} {user?.last_name}
+                    {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.displayName || user?.username}
                   </p>
                   {user?.is_premium && (
                     <Badge variant="secondary" className="text-xs">

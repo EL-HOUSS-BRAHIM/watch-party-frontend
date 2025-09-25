@@ -10,11 +10,20 @@ export interface APIResponse<T = any> {
   errors?: Record<string, string[]>
 }
 
-export interface PaginatedResponse<T> {
-  results: T[]
-  count: number
+export interface PaginationLinks {
   next: string | null
   previous: string | null
+  total?: number
+  page?: number
+  page_size?: number
+}
+
+export interface PaginatedResponse<T> {
+  results: T[]
+  pagination?: PaginationLinks
+  count?: number
+  next?: string | null
+  previous?: string | null
 }
 
 export interface APIError {
@@ -24,36 +33,105 @@ export interface APIError {
 }
 
 // Authentication types - matching backend responses
-export interface User {
+export interface RawUser {
   id: string
   email: string
-  first_name: string
-  last_name: string
-  full_name: string
-  avatar: string | null
-  is_premium: boolean
-  subscription_expires: string | null
-  is_subscription_active: boolean
-  date_joined: string
-  last_login: string | null
+  username: string
+  first_name?: string
+  last_name?: string
+  full_name?: string
+  display_name?: string
+  avatar?: string | null
+  is_premium?: boolean
+  subscription_expires?: string | null
+  is_subscription_active?: boolean
+  date_joined?: string
+  last_login?: string | null
+  role?: string
+  status?: string
+  is_online?: boolean
+  last_seen?: string
+  last_active?: string
   is_staff?: boolean
   is_superuser?: boolean
+  is_verified?: boolean
+  is_email_verified?: boolean
+  two_factor_enabled?: boolean
+  onboarding_completed?: boolean
+  [key: string]: unknown
+}
+
+export interface User {
+  id: string
+  email?: string
+  username: string
+  firstName?: string
+  lastName?: string
+  fullName?: string
+  displayName?: string
+  /** @deprecated use camelCase properties */
+  first_name?: string
+  /** @deprecated use camelCase properties */
+  last_name?: string
+  /** @deprecated use camelCase properties */
+  full_name?: string
+  /** @deprecated use camelCase properties */
+  display_name?: string
+  avatar?: string | null
+  isPremium?: boolean
+  subscriptionExpires?: string | null
+  isSubscriptionActive?: boolean
+  dateJoined?: string
+  lastLogin?: string | null
+  role?: string
+  status?: string
+  isOnline?: boolean
+  lastSeen?: string
+  lastActive?: string
+  isStaff?: boolean
+  isSuperuser?: boolean
   isVerified?: boolean
   isEmailVerified?: boolean
   twoFactorEnabled?: boolean
+  onboardingCompleted?: boolean
+  /** @deprecated use camelCase properties */
+  is_premium?: boolean
+  /** @deprecated use camelCase properties */
+  subscription_expires?: string | null
+  /** @deprecated use camelCase properties */
+  is_subscription_active?: boolean
+  /** @deprecated use camelCase properties */
+  date_joined?: string
+  /** @deprecated use camelCase properties */
+  last_login?: string | null
+  /** @deprecated use camelCase properties */
+  is_verified?: boolean
+  /** @deprecated use camelCase properties */
+  is_email_verified?: boolean
+  /** @deprecated use camelCase properties */
+  two_factor_enabled?: boolean
+  /** @deprecated use camelCase properties */
   onboarding_completed?: boolean
+  /** @deprecated use camelCase properties */
+  is_staff?: boolean
+  /** @deprecated use camelCase properties */
+  is_superuser?: boolean
 }
 
-export interface AuthResponse {
+export interface RawAuthResponse {
   success: boolean
   access_token: string
   refresh_token: string
-  user: User
+  user: RawUser
   verification_sent?: boolean
   requires_2fa?: boolean
   temp_token?: string
   email?: string
   message?: string
+}
+
+export interface AuthResponse extends Omit<RawAuthResponse, "user"> {
+  user: User
 }
 
 export interface TwoFactorSetupResponse {
@@ -63,13 +141,17 @@ export interface TwoFactorSetupResponse {
   backup_codes?: string[]
 }
 
-export interface TwoFactorVerifyResponse {
+export interface RawTwoFactorVerifyResponse {
   success: boolean
   backup_codes?: string[]
   access_token?: string
   refresh_token?: string
-  user?: User
+  user?: RawUser
   message?: string
+}
+
+export interface TwoFactorVerifyResponse extends Omit<RawTwoFactorVerifyResponse, "user"> {
+  user?: User
 }
 
 // Additional User Types
@@ -426,6 +508,7 @@ export interface AnalyticsRealtimeSnapshot {
   concurrent_streams: number
   messages_per_minute: number
   bandwidth_usage: number
+  active_parties?: number
   user_growth_rate?: number
   stream_growth_rate?: number
   chat_activity_rate?: number
@@ -501,23 +584,54 @@ export interface SocialGroupDetail extends SocialGroup {
 }
 
 // Messaging Types
-export interface Conversation {
-  id: number
-  participants: User[]
-  last_message?: Message
+export interface RawConversation {
+  id: number | string
+  type?: 'direct' | 'group'
+  name?: string
+  participants: Array<RawUser | User>
+  last_message?: RawMessage
   unread_count: number
   created_at: string
   updated_at: string
+  [key: string]: unknown
+}
+
+export interface RawMessage {
+  id: string
+  conversation: number | string
+  sender: RawUser | User
+  content: string
+  message_type: 'text' | 'image' | 'file' | 'system'
+  sent_at?: string
+  created_at?: string
+  is_read: boolean
+  attachments?: Array<{ id: string; name: string; url: string; type: string; size?: number }>
+  reply_to?: string
+  [key: string]: unknown
+}
+
+export interface Conversation {
+  id: string
+  type: 'direct' | 'group'
+  name?: string
+  participants: User[]
+  lastMessage?: Message
+  unreadCount: number
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Message {
   id: string
-  conversation: number
+  conversationId: string
   sender: User
+  senderId?: string
   content: string
-  message_type: 'text' | 'image' | 'file'
-  sent_at: string
-  is_read: boolean
+  type: 'text' | 'image' | 'file' | 'system'
+  createdAt: string
+  isRead: boolean
+  attachments?: Array<{ id: string; name: string; url: string; type: string; size?: number }>
+  replyTo?: string
 }
 
 // Support Types
@@ -829,37 +943,77 @@ export interface UserProfile {
 }
 
 // Video types - matching backend structure
-export interface Video {
+export interface RawVideo {
   id: string
   title: string
   description: string
   uploader: {
     id: string
-    name: string
-    avatar: string
-    is_premium: boolean
+    username?: string
+    first_name?: string
+    last_name?: string
+    display_name?: string
+    avatar?: string
+    is_premium?: boolean
   }
-  thumbnail: string | null
-  duration: string | null
-  file_size: number | null
-  source_type: 'upload' | 'url' | 'drive'
+  thumbnail?: string | null
+  duration?: number | string | null
+  file_size?: number | null
+  source_type?: 'upload' | 'url' | 'drive'
   source_url?: string
   resolution?: string
   codec?: string
   bitrate?: number
   fps?: number
-  visibility: 'public' | 'private' | 'unlisted'
-  status: 'pending' | 'processing' | 'ready' | 'failed'
-  allow_download: boolean
-  require_premium: boolean
-  view_count: number
-  like_count: number
-  comments_count: number
-  is_liked: boolean
-  can_edit: boolean
-  can_download: boolean
-  created_at: string
-  updated_at: string
+  visibility?: 'public' | 'private' | 'unlisted'
+  status?: 'pending' | 'processing' | 'ready' | 'failed'
+  allow_download?: boolean
+  require_premium?: boolean
+  view_count?: number
+  like_count?: number
+  comments_count?: number
+  is_liked?: boolean
+  can_edit?: boolean
+  can_download?: boolean
+  created_at?: string
+  updated_at?: string
+  uploaded_at?: string
+  upload_progress?: number
+  format?: string
+  [key: string]: unknown
+}
+
+export interface Video {
+  id: string
+  title: string
+  description: string
+  uploader: User & {
+    displayName?: string
+  }
+  thumbnail?: string | null
+  duration?: number
+  size?: number | null
+  sourceType?: 'upload' | 'url' | 'drive'
+  sourceUrl?: string
+  resolution?: string
+  codec?: string
+  bitrate?: number
+  fps?: number
+  visibility?: 'public' | 'private' | 'unlisted'
+  status?: 'pending' | 'processing' | 'ready' | 'failed'
+  allowDownload?: boolean
+  requirePremium?: boolean
+  views: number
+  likes: number
+  comments: number
+  isLiked?: boolean
+  canEdit?: boolean
+  canDownload?: boolean
+  createdAt?: string
+  updatedAt?: string
+  uploadedAt?: string
+  uploadProgress?: number
+  format?: string
 }
 
 export interface VideoUpload {

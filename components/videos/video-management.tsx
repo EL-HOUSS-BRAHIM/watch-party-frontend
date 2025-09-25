@@ -160,8 +160,11 @@ export function VideoManagement({ className }: VideoManagementProps) {
 
       if (response.ok) {
         const data = await response.json()
-        setVideos(data.results || [])
-        setTotalPages(Math.ceil(data.count / 20))
+        const results = data.results ?? []
+        setVideos(results)
+        const totalItems = data.pagination?.total ?? data.count ?? results.length
+        const pageSize = data.pagination?.page_size ?? 20
+        setTotalPages(totalItems ? Math.max(1, Math.ceil(totalItems / pageSize)) : 1)
       }
     } catch (error) {
       console.error('Failed to load videos:', error)

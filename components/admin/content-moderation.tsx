@@ -105,9 +105,13 @@ export default function ContentModeration() {
         type: typeFilter !== "all" ? typeFilter : undefined,
         page: currentPage,
       })
-      
-      setReports(data.results || [])
-      setTotalPages(data.totalPages || Math.ceil(data.count / 20))
+
+      const results = data.results ?? []
+      setReports(results)
+
+      const totalItems = data.pagination?.total ?? data.count ?? results.length
+      const pageSize = data.pagination?.page_size ?? 20
+      setTotalPages(totalItems ? Math.max(1, Math.ceil(totalItems / pageSize)) : 1)
     } catch (error) {
       console.error("Failed to load reports:", error)
       toast({

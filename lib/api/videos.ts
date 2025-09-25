@@ -5,6 +5,7 @@
 
 import { apiClient } from "./client"
 import { API_ENDPOINTS } from "./endpoints"
+import { transformPaginatedResponse, transformVideo } from "./transformers"
 import type {
   Video,
   VideoUpload,
@@ -15,6 +16,7 @@ import type {
   PaginatedResponse,
   APIResponse,
   UploadProgressCallback,
+  RawVideo,
 } from "./types"
 
 export class VideosAPI {
@@ -28,7 +30,10 @@ export class VideosAPI {
     uploader?: string
     ordering?: string
   }): Promise<PaginatedResponse<Video>> {
-    return apiClient.get<PaginatedResponse<Video>>(API_ENDPOINTS.videos.list, { params })
+    const response = await apiClient.get<PaginatedResponse<RawVideo>>(API_ENDPOINTS.videos.list, {
+      params,
+    })
+    return transformPaginatedResponse(response, transformVideo)
   }
 
   /**
@@ -41,21 +46,24 @@ export class VideosAPI {
     allow_download?: boolean
     require_premium?: boolean
   }): Promise<Video> {
-    return apiClient.post<Video>(API_ENDPOINTS.videos.create, data)
+    const response = await apiClient.post<RawVideo>(API_ENDPOINTS.videos.create, data)
+    return transformVideo(response)
   }
 
   /**
    * Get video details
    */
   async getVideo(videoId: string): Promise<Video> {
-    return apiClient.get<Video>(API_ENDPOINTS.videos.detail(videoId))
+    const response = await apiClient.get<RawVideo>(API_ENDPOINTS.videos.detail(videoId))
+    return transformVideo(response)
   }
 
   /**
    * Update video details
    */
   async updateVideo(videoId: string, data: Partial<Video>): Promise<Video> {
-    return apiClient.patch<Video>(API_ENDPOINTS.videos.detail(videoId), data)
+    const response = await apiClient.patch<RawVideo>(API_ENDPOINTS.videos.detail(videoId), data)
+    return transformVideo(response)
   }
 
   /**
@@ -126,7 +134,21 @@ export class VideosAPI {
       qualities: Array<{ name: string; count: number }>
     }
   }> {
-    return apiClient.get(API_ENDPOINTS.videos.search, { params })
+    const response = await apiClient.get<
+      PaginatedResponse<RawVideo> & {
+        facets: {
+          categories: Array<{ name: string; count: number }>
+          qualities: Array<{ name: string; count: number }>
+        }
+      }
+    >(API_ENDPOINTS.videos.search, { params })
+
+    const normalized = transformPaginatedResponse(response, transformVideo)
+    return {
+      ...response,
+      ...normalized,
+      results: normalized.results,
+    }
   }
 
   // === VIDEO COMMENTS & INTERACTIONS ===
@@ -307,7 +329,8 @@ export class VideosAPI {
     country?: string
     limit?: number
   }): Promise<Video[]> {
-    return apiClient.get<Video[]>(API_ENDPOINTS.videos.trending, { params })
+    const response = await apiClient.get<RawVideo[]>(API_ENDPOINTS.videos.trending, { params })
+    return response.map(transformVideo)
   }
 
   // === VIDEO MANAGEMENT ===
@@ -342,7 +365,17 @@ export class VideosAPI {
   }): Promise<PaginatedResponse<Video> & {
     aggregations: object
   }> {
-    return apiClient.get(API_ENDPOINTS.videos.advancedSearch, { params })
+    const response = await apiClient.get<PaginatedResponse<RawVideo> & { aggregations: object }>(
+      API_ENDPOINTS.videos.advancedSearch,
+      { params },
+    )
+
+    const normalized = transformPaginatedResponse(response, transformVideo)
+    return {
+      ...response,
+      ...normalized,
+      results: normalized.results,
+    }
   }
 
   // === GOOGLE DRIVE INTEGRATION ===
