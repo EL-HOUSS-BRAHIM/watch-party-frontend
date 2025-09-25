@@ -5,6 +5,7 @@
 
 import { apiClient } from "./client"
 import { API_ENDPOINTS } from "./endpoints"
+import { normalizeRealtimeSnapshot } from "./transformers"
 import type {
   AnalyticsDashboard,
   UserAnalytics,
@@ -164,7 +165,8 @@ export class AnalyticsAPI {
    * Get real-time analytics
    */
   async getRealtimeAnalytics(): Promise<AnalyticsRealtimeSnapshot> {
-    return apiClient.get<AnalyticsRealtimeSnapshot>(API_ENDPOINTS.analytics.realtime)
+    const response = await apiClient.get<AnalyticsRealtimeSnapshot>(API_ENDPOINTS.analytics.realtime)
+    return normalizeRealtimeSnapshot(response)
   }
 
   /**
@@ -229,7 +231,8 @@ export class AnalyticsAPI {
    * Get real-time data
    */
   async getRealTimeData(): Promise<AnalyticsRealtimeSnapshot> {
-    return apiClient.get<AnalyticsRealtimeSnapshot>(API_ENDPOINTS.analytics.realTimeData)
+    const response = await apiClient.get<AnalyticsRealtimeSnapshot>(API_ENDPOINTS.analytics.realTimeData)
+    return normalizeRealtimeSnapshot(response)
   }
 }
 

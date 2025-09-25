@@ -5,6 +5,7 @@
 
 import { apiClient } from "./client"
 import { API_ENDPOINTS } from "./endpoints"
+import { transformPaginatedResponse, transformUser } from "./transformers"
 import type {
   DashboardStats,
   User,
@@ -20,6 +21,7 @@ import type {
   Favorite,
   PaginatedResponse,
   APIResponse,
+  RawUser,
 } from "./types"
 
 export class UsersAPI {
@@ -34,14 +36,31 @@ export class UsersAPI {
    * Get user profile
    */
   async getProfile(): Promise<User & { profile: UserProfile }> {
-    return apiClient.get<User & { profile: UserProfile }>(API_ENDPOINTS.users.profile)
+    const response = await apiClient.get<RawUser & { profile: UserProfile }>(
+      API_ENDPOINTS.users.profile,
+    )
+
+    const { profile, ...user } = response
+    return {
+      ...transformUser(user),
+      profile,
+    }
   }
 
   /**
    * Update user profile (using separate update endpoint)
    */
   async updateProfile(data: Partial<UserProfile>): Promise<User & { profile: UserProfile }> {
-    return apiClient.put<User & { profile: UserProfile }>(API_ENDPOINTS.users.profileUpdate, data)
+    const response = await apiClient.put<RawUser & { profile: UserProfile }>(
+      API_ENDPOINTS.users.profileUpdate,
+      data,
+    )
+
+    const { profile, ...user } = response
+    return {
+      ...transformUser(user),
+      profile,
+    }
   }
 
   /**

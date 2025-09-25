@@ -1,5 +1,7 @@
 import axios from "axios"
-import jest from "jest" // Declare the jest variable
+import { AxiosHeaders } from "axios"
+import type { InternalAxiosRequestConfig } from "axios"
+import { jest } from "@jest/globals"
 import { environment } from "@/lib/config/env"
 
 jest.mock("axios")
@@ -7,7 +9,7 @@ const mockedAxios = axios as jest.Mocked<typeof axios>
 
 describe("API Client", () => {
   beforeEach(() => {
-    jest.clearAllMocks() // Use the jest variable
+    jest.clearAllMocks()
   })
 
   it("creates axios instance with correct config", () => {
@@ -21,7 +23,6 @@ describe("API Client", () => {
   })
 
   it("adds auth token to requests when available", () => {
-    // Mock localStorage
     const mockToken = "test-token"
     Object.defineProperty(window, "localStorage", {
       value: {
@@ -32,12 +33,21 @@ describe("API Client", () => {
       writable: true,
     })
 
-    // Test request interceptor
-    const config = { headers: {} }
-    const interceptor = mockedAxios.interceptors.request.use.mock.calls[0][0]
-    const result = interceptor(config)
+    const interceptor = mockedAxios.interceptors.request.use.mock
+      .calls[0]?.[0] as
+      | ((config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig)
+      | undefined
 
-    expect(result.headers.Authorization).toBe(`Bearer ${mockToken}`)
+    expect(interceptor).toBeDefined()
+
+    const config = {
+      headers: new AxiosHeaders(),
+    } as InternalAxiosRequestConfig
+
+    const result = interceptor!(config) as InternalAxiosRequestConfig
+    const headers = (result.headers ?? config.headers) as AxiosHeaders
+
+    expect(headers.get("Authorization")).toBe(`Bearer ${mockToken}`)
   })
 
   it("handles response errors correctly", () => {

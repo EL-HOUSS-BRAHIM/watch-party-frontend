@@ -1,52 +1,68 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { EnhancedSocialFeatures } from '@/components/social/enhanced-social-features'
-import { socialAPI, usersAPI } from '@/lib/api'
-import { useToast } from '@/hooks/use-toast'
+import { jest } from '@jest/globals'
 
-// Mock the API modules
+type Mock = ReturnType<typeof jest.fn>
+
+const getGroupsMock: Mock = jest.fn()
+const joinGroupMock: Mock = jest.fn()
+const getFriendsMock: Mock = jest.fn()
+const getFriendSuggestionsMock: Mock = jest.fn()
+const getActivityMock: Mock = jest.fn()
+const getAchievementsMock: Mock = jest.fn()
+const sendFriendRequestMock: Mock = jest.fn()
+const useToastMock: Mock = jest.fn()
+const mockToast: Mock = jest.fn()
+
+const EnhancedSocialFeatures = require('@/components/social/enhanced-social-features').EnhancedSocialFeatures as typeof import('@/components/social/enhanced-social-features').EnhancedSocialFeatures
+
 jest.mock('@/lib/api', () => ({
   socialAPI: {
-    getGroups: jest.fn(),
-    joinGroup: jest.fn(),
+    getGroups: (...args: unknown[]) => getGroupsMock(...args),
+    joinGroup: (...args: unknown[]) => joinGroupMock(...args),
   },
   usersAPI: {
-    getFriends: jest.fn(),
-    getFriendSuggestions: jest.fn(),
-    getActivity: jest.fn(),
-    getAchievements: jest.fn(),
-    sendFriendRequest: jest.fn(),
+    getFriends: (...args: unknown[]) => getFriendsMock(...args),
+    getFriendSuggestions: (...args: unknown[]) => getFriendSuggestionsMock(...args),
+    getActivity: (...args: unknown[]) => getActivityMock(...args),
+    getAchievements: (...args: unknown[]) => getAchievementsMock(...args),
+    sendFriendRequestToUser: (...args: unknown[]) => sendFriendRequestMock(...args),
   },
 }))
 
-// Mock the toast hook
 jest.mock('@/hooks/use-toast', () => ({
-  useToast: jest.fn(),
+  useToast: (...args: unknown[]) => useToastMock(...args),
 }))
-
-const mockToast = jest.fn()
 
 const mockFriendsResponse = {
   results: [
     {
       id: '1',
       username: 'testuser1',
+      displayName: 'Test User 1',
       display_name: 'Test User 1',
+      avatar: '/test-avatar1.jpg',
       avatar_url: '/test-avatar1.jpg',
+      isOnline: true,
       is_online: true,
-      last_seen: '2025-01-01T00:00:00Z'
-    }
-  ]
+      lastSeen: '2025-01-01T00:00:00Z',
+      last_seen: '2025-01-01T00:00:00Z',
+    },
+  ],
 }
 
 const mockSuggestionsResponse = [
   {
     id: '2',
     username: 'suggested1',
+    displayName: 'Suggested User',
     display_name: 'Suggested User',
+    avatar: '/suggested-avatar.jpg',
     avatar_url: '/suggested-avatar.jpg',
+    isOnline: false,
     is_online: false,
-    mutual_friends: 5
-  }
+    mutualFriends: 5,
+    mutual_friends: 5,
+  },
 ]
 
 const mockCommunitiesResponse = {
@@ -55,11 +71,13 @@ const mockCommunitiesResponse = {
       id: '1',
       name: 'Test Community',
       description: 'A test community',
+      memberCount: 100,
       member_count: 100,
+      isPublic: true,
       is_public: true,
-      thumbnail: '/community-thumb.jpg'
-    }
-  ]
+      thumbnail: '/community-thumb.jpg',
+    },
+  ],
 }
 
 const mockActivityResponse = {
@@ -69,17 +87,22 @@ const mockActivityResponse = {
       user: {
         id: '1',
         username: 'testuser1',
+        displayName: 'Test User 1',
         display_name: 'Test User 1',
-        avatar_url: '/test-avatar1.jpg'
+        avatar: '/test-avatar1.jpg',
+        avatar_url: '/test-avatar1.jpg',
       },
+      activityType: 'video_watch',
       activity_type: 'video_watch',
       metadata: {
         title: 'Test Video',
-        video_id: 'vid123'
+        videoId: 'vid123',
+        video_id: 'vid123',
       },
-      created_at: '2025-01-01T00:00:00Z'
-    }
-  ]
+      createdAt: '2025-01-01T00:00:00Z',
+      created_at: '2025-01-01T00:00:00Z',
+    },
+  ],
 }
 
 const mockAchievementsResponse = [
@@ -88,19 +111,31 @@ const mockAchievementsResponse = [
     name: 'First Watch',
     description: 'Watched your first video',
     icon: '🎬',
-    unlocked_at: '2025-01-01T00:00:00Z'
-  }
+    unlockedAt: '2025-01-01T00:00:00Z',
+    unlocked_at: '2025-01-01T00:00:00Z',
+  },
 ]
 
 describe('EnhancedSocialFeatures', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(useToast as jest.Mock).mockReturnValue({ toast: mockToast })
-    ;(usersAPI.getFriends as jest.Mock).mockResolvedValue(mockFriendsResponse)
-    ;(usersAPI.getFriendSuggestions as jest.Mock).mockResolvedValue(mockSuggestionsResponse)
-    ;(socialAPI.getGroups as jest.Mock).mockResolvedValue(mockCommunitiesResponse)
-    ;(usersAPI.getActivity as jest.Mock).mockResolvedValue(mockActivityResponse)
-    ;(usersAPI.getAchievements as jest.Mock).mockResolvedValue(mockAchievementsResponse)
+    getGroupsMock.mockReset()
+    joinGroupMock.mockReset()
+    getFriendsMock.mockReset()
+    getFriendSuggestionsMock.mockReset()
+    getActivityMock.mockReset()
+    getAchievementsMock.mockReset()
+    sendFriendRequestMock.mockReset()
+    useToastMock.mockReset()
+    mockToast.mockReset()
+
+    useToastMock.mockReturnValue({ toast: mockToast })
+    getFriendsMock.mockResolvedValue(mockFriendsResponse)
+    getFriendSuggestionsMock.mockResolvedValue(mockSuggestionsResponse)
+    getGroupsMock.mockResolvedValue(mockCommunitiesResponse)
+    getActivityMock.mockResolvedValue(mockActivityResponse)
+    getAchievementsMock.mockResolvedValue(mockAchievementsResponse)
+    sendFriendRequestMock.mockResolvedValue({})
   })
 
   it('renders loading state initially', () => {
@@ -112,11 +147,11 @@ describe('EnhancedSocialFeatures', () => {
     render(<EnhancedSocialFeatures />)
 
     await waitFor(() => {
-      expect(usersAPI.getFriends).toHaveBeenCalledWith({ limit: 20 })
-      expect(usersAPI.getFriendSuggestions).toHaveBeenCalledWith({ limit: 20 })
-      expect(socialAPI.getGroups).toHaveBeenCalledWith({ page: 1, public_only: true })
-      expect(usersAPI.getActivity).toHaveBeenCalledWith({ page: 1 })
-      expect(usersAPI.getAchievements).toHaveBeenCalled()
+      expect(getFriendsMock).toHaveBeenCalledWith({ limit: 20 })
+      expect(getFriendSuggestionsMock).toHaveBeenCalledWith({ limit: 20 })
+      expect(getGroupsMock).toHaveBeenCalledWith({ page: 1, public_only: true })
+      expect(getActivityMock).toHaveBeenCalledWith({ page: 1 })
+      expect(getAchievementsMock).toHaveBeenCalled()
     })
 
     // Check that the data is displayed
@@ -125,7 +160,7 @@ describe('EnhancedSocialFeatures', () => {
   })
 
   it('handles API errors gracefully', async () => {
-    ;(usersAPI.getFriends as jest.Mock).mockRejectedValue(new Error('API Error'))
+    getFriendsMock.mockRejectedValue(new Error('API Error'))
 
     render(<EnhancedSocialFeatures />)
 
@@ -139,7 +174,7 @@ describe('EnhancedSocialFeatures', () => {
   })
 
   it('can send friend requests', async () => {
-    ;(usersAPI.sendFriendRequest as jest.Mock).mockResolvedValue({})
+    sendFriendRequestMock.mockResolvedValue({})
 
     render(<EnhancedSocialFeatures />)
 
@@ -151,16 +186,16 @@ describe('EnhancedSocialFeatures', () => {
     fireEvent.click(addFriendButton)
 
     await waitFor(() => {
-      expect(usersAPI.sendFriendRequest).toHaveBeenCalledWith('2')
+      expect(sendFriendRequestMock).toHaveBeenCalledWith('2')
     })
   })
 
   it('handles empty responses gracefully', async () => {
-    ;(usersAPI.getFriends as jest.Mock).mockResolvedValue({ results: [] })
-    ;(usersAPI.getFriendSuggestions as jest.Mock).mockResolvedValue([])
-    ;(socialAPI.getGroups as jest.Mock).mockResolvedValue({ results: [] })
-    ;(usersAPI.getActivity as jest.Mock).mockResolvedValue({ results: [] })
-    ;(usersAPI.getAchievements as jest.Mock).mockResolvedValue([])
+    getFriendsMock.mockResolvedValue({ results: [] })
+    getFriendSuggestionsMock.mockResolvedValue([])
+    getGroupsMock.mockResolvedValue({ results: [] })
+    getActivityMock.mockResolvedValue({ results: [] })
+    getAchievementsMock.mockResolvedValue([])
 
     render(<EnhancedSocialFeatures />)
 

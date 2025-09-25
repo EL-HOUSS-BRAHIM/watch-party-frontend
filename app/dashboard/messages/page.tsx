@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { messagingAPI } from "@/lib/api"
+import type { Conversation, Message, User } from "@/lib/api/types"
 import {
   MessageCircle,
   Send,
@@ -31,50 +32,9 @@ import {
 } from "lucide-react"
 import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns"
 
-interface Message {
-  id: string
-  content: string
-  type: "text" | "image" | "file" | "system"
-  senderId: string
-  conversationId: string
-  createdAt: string
-  isRead: boolean
-  replyTo?: string
-  attachments?: Array<{
-    id: string
-    name: string
-    url: string
-    type: string
-    size: number
-  }>
-}
-
-interface Conversation {
-  id: string
-  type: "direct" | "group"
-  name?: string
-  participants: Array<{
-    id: string
-    username: string
-    firstName: string
-    lastName: string
-    avatar?: string
-    isOnline: boolean
-    lastSeen?: string
-  }>
-  lastMessage?: Message
-  unreadCount: number
-  createdAt: string
-  updatedAt: string
-}
-
-interface OnlineUser {
-  id: string
-  username: string
-  firstName: string
-  lastName: string
-  avatar?: string
+type OnlineUser = Pick<User, "id" | "username" | "firstName" | "lastName" | "avatar"> & {
   isOnline: boolean
+  lastSeen?: string
 }
 
 export default function MessagesPage() {
@@ -116,7 +76,7 @@ export default function MessagesPage() {
   const loadConversations = async () => {
     try {
       const data = await messagingAPI.getConversations()
-      setConversations(data.results || data.conversations || [])
+      setConversations(data.results)
     } catch (error) {
       console.error("Failed to load conversations:", error)
       toast({
@@ -132,7 +92,7 @@ export default function MessagesPage() {
   const loadMessages = async (conversationId: string) => {
     try {
       const data = await messagingAPI.getMessages(conversationId)
-      setMessages(data.results || data.messages || [])
+      setMessages(data.results)
     } catch (error) {
       console.error("Failed to load messages:", error)
       toast({
@@ -146,10 +106,17 @@ export default function MessagesPage() {
   const loadOnlineUsers = async () => {
     try {
       const data = await messagingAPI.getOnlineFriends()
-      const friends = Array.isArray(data)
-        ? data
-        : data?.results || []
-      setOnlineUsers(friends)
+      setOnlineUsers(
+        data.map(friend => ({
+          id: friend.id,
+          username: friend.username,
+          firstName: friend.firstName ?? friend.displayName ?? friend.username,
+          lastName: friend.lastName ?? "",
+          avatar: friend.avatar,
+          isOnline: friend.isOnline ?? true,
+          lastSeen: friend.lastSeen,
+        })),
+      )
     } catch (error) {
       console.error("Failed to load online users:", error)
     }
@@ -234,13 +201,17 @@ export default function MessagesPage() {
     if (conversation.type === "group" && conversation.name) {
       return conversation.name
     }
-    
+
     const otherParticipant = conversation.participants.find(p => p.id !== user?.id)
     if (otherParticipant) {
-      return `${otherParticipant.firstName} ${otherParticipant.lastName}`
+      const first =
+        otherParticipant.firstName ?? otherParticipant.displayName ?? otherParticipant.username
+      const last = otherParticipant.lastName ?? ""
+      const name = [first, last].filter(Boolean).join(" ")
+      return name || otherParticipant.username
     }
-    
-    return "Unknown"
+
+    return conversation.name || "Conversation"
   }
 
   const getConversationAvatar = (conversation: Conversation) => {

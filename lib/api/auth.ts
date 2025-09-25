@@ -5,6 +5,7 @@
 
 import { apiClient } from "./client"
 import { API_ENDPOINTS } from "./endpoints"
+import { transformAuthResponse, transformTwoFactorVerifyResponse, transformUser } from "./transformers"
 import { tokenStorage } from "@/lib/auth/token-storage"
 import { environment, isBrowser } from "@/lib/config/env"
 import type {
@@ -14,6 +15,9 @@ import type {
   ForgotPasswordRequest,
   ResetPasswordRequest,
   ChangePasswordRequest,
+  RawAuthResponse,
+  RawTwoFactorVerifyResponse,
+  RawUser,
   User,
   APIResponse,
   TwoFactorSetupResponse,
@@ -25,14 +29,16 @@ export class AuthAPI {
    * Register a new user
    */
   async register(userData: RegisterData): Promise<AuthResponse> {
-    return apiClient.post<AuthResponse>(API_ENDPOINTS.auth.register, userData)
+    const response = await apiClient.post<RawAuthResponse>(API_ENDPOINTS.auth.register, userData)
+    return transformAuthResponse(response)
   }
 
   /**
    * Login user with email and password
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    return apiClient.post<AuthResponse>(API_ENDPOINTS.auth.login, credentials)
+    const response = await apiClient.post<RawAuthResponse>(API_ENDPOINTS.auth.login, credentials)
+    return transformAuthResponse(response)
   }
 
   /**
@@ -95,7 +101,8 @@ export class AuthAPI {
    * Get current user profile
    */
   async getProfile(): Promise<User> {
-    return apiClient.get<User>(API_ENDPOINTS.auth.profile)
+    const profile = await apiClient.get<RawUser>(API_ENDPOINTS.auth.profile)
+    return transformUser(profile)
   }
 
   /**
@@ -117,11 +124,15 @@ export class AuthAPI {
       email?: string
     },
   ): Promise<TwoFactorVerifyResponse> {
-    return apiClient.post<TwoFactorVerifyResponse>(API_ENDPOINTS.auth.twoFactorVerify, {
-      token: code,
-      code,
-      ...options,
-    })
+    const response = await apiClient.post<RawTwoFactorVerifyResponse>(
+      API_ENDPOINTS.auth.twoFactorVerify,
+      {
+        token: code,
+        code,
+        ...options,
+      },
+    )
+    return transformTwoFactorVerifyResponse(response)
   }
 
   /**
@@ -197,11 +208,12 @@ export class AuthAPI {
   async completeSocialAuth(provider: string, code: string, state?: string): Promise<AuthResponse> {
     const redirectUri = `${window.location.origin}/callback?provider=${provider}`
 
-    return apiClient.post<AuthResponse>(API_ENDPOINTS.auth.socialAuth(provider), {
+    const response = await apiClient.post<RawAuthResponse>(API_ENDPOINTS.auth.socialAuth(provider), {
       code,
       state,
       redirect_uri: redirectUri,
     })
+    return transformAuthResponse(response)
   }
 
   /**

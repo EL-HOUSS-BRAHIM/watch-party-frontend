@@ -5,11 +5,16 @@
 
 import { apiClient } from "./client"
 import { API_ENDPOINTS } from "./endpoints"
+import { transformConversation, transformMessage, transformPaginatedResponse, transformUser } from "./transformers"
 import type {
   Conversation,
   Message,
   PaginatedResponse,
   APIResponse,
+  RawConversation,
+  RawMessage,
+  RawUser,
+  User,
 } from "./types"
 
 export class MessagingAPI {
@@ -20,7 +25,11 @@ export class MessagingAPI {
     page?: number
     unread_only?: boolean
   }): Promise<PaginatedResponse<Conversation>> {
-    return apiClient.get<PaginatedResponse<Conversation>>(API_ENDPOINTS.messaging.conversations, { params })
+    const response = await apiClient.get<PaginatedResponse<RawConversation>>(
+      API_ENDPOINTS.messaging.conversations,
+      { params },
+    )
+    return transformPaginatedResponse(response, transformConversation)
   }
 
   /**
@@ -31,7 +40,8 @@ export class MessagingAPI {
     participants: string[]
     message?: string
   }): Promise<Conversation> {
-    return apiClient.post<Conversation>(API_ENDPOINTS.messaging.conversations, data)
+    const response = await apiClient.post<RawConversation>(API_ENDPOINTS.messaging.conversations, data)
+    return transformConversation(response)
   }
 
   /**
@@ -42,10 +52,11 @@ export class MessagingAPI {
     limit?: number
     before?: string
   }): Promise<PaginatedResponse<Message>> {
-    return apiClient.get<PaginatedResponse<Message>>(
-      API_ENDPOINTS.messaging.messages(conversationId), 
-      { params }
+    const response = await apiClient.get<PaginatedResponse<RawMessage>>(
+      API_ENDPOINTS.messaging.messages(conversationId),
+      { params },
     )
+    return transformPaginatedResponse(response, transformMessage)
   }
 
   /**
@@ -56,15 +67,28 @@ export class MessagingAPI {
     type?: 'text' | 'image' | 'file'
     message_type?: 'text' | 'image' | 'file'
   }): Promise<Message> {
-    return apiClient.post<Message>(API_ENDPOINTS.messaging.messages(conversationId), data)
+    const response = await apiClient.post<RawMessage>(
+      API_ENDPOINTS.messaging.messages(conversationId),
+      data,
+    )
+    return transformMessage(response)
   }
 
   /**
    * Get online friends for quick messaging
    */
-  async getOnlineFriends(): Promise<any[]> {
-    return apiClient.get<any[]>(API_ENDPOINTS.users.friends, {
-      params: { online_only: true },
-    })
+  async getOnlineFriends(): Promise<User[]> {
+    const response = await apiClient.get<PaginatedResponse<RawUser> | RawUser[]>(
+      API_ENDPOINTS.users.friends,
+      {
+        params: { online_only: true },
+      },
+    )
+
+    if (Array.isArray(response)) {
+      return response.map(transformUser)
+    }
+
+    return transformPaginatedResponse(response, transformUser).results
   }
 }

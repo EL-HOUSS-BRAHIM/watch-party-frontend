@@ -121,8 +121,11 @@ export default function SystemLogs() {
 
       if (response.ok) {
         const data = await response.json()
-        setLogs(data.results || data.logs || [])
-        setTotalPages(data.totalPages || Math.ceil(data.count / 50))
+        const results = Array.isArray(data.results) ? data.results : data.logs ?? []
+        setLogs(results)
+        const totalItems = data.pagination?.total ?? data.count ?? results.length
+        const pageSize = data.pagination?.page_size ?? 50
+        setTotalPages(totalItems ? Math.max(1, Math.ceil(totalItems / pageSize)) : 1)
       }
     } catch (error) {
       console.error("Failed to load logs:", error)

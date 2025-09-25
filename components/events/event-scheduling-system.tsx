@@ -68,7 +68,7 @@ export default function EventSchedulingSystem() {
         limit: 100,
         status: filterStatus === "all" ? undefined : filterStatus as any,
       })
-      setEvents(response.events)
+      setEvents(response.results)
     } catch (error) {
       console.error("Failed to load events:", error)
       toast({
@@ -89,7 +89,7 @@ export default function EventSchedulingSystem() {
   const loadEventAttendees = async (eventId: string) => {
     try {
       const attendees = await eventsAPI.getEventAttendees(eventId)
-      setEventAttendees(attendees)
+      setEventAttendees(attendees.results)
     } catch (error) {
       console.error("Failed to load attendees:", error)
       toast({

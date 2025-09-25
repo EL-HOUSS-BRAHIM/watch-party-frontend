@@ -18,14 +18,20 @@ export interface ApiResponse<T = any> {
   status: number
 }
 
+export interface PaginationMeta {
+  next: string | null
+  previous: string | null
+  total?: number
+  page?: number
+  page_size?: number
+}
+
 export interface PaginatedResponse<T = any> {
   results: T[]
-  count: number
-  next?: string
-  previous?: string
-  page_size: number
-  current_page: number
-  total_pages: number
+  pagination?: PaginationMeta
+  count?: number
+  next?: string | null
+  previous?: string | null
 }
 
 export interface ApiError {
@@ -33,6 +39,14 @@ export interface ApiError {
   errors?: Record<string, string[]>
   status: number
   code?: string
+}
+
+export interface ApiErrorPayload {
+  message?: string
+  detail?: string
+  errors?: Record<string, string[]>
+  code?: string
+  [key: string]: unknown
 }
 
 // Configuration
@@ -243,9 +257,9 @@ export class ApiClient {
   private handleError(error: AxiosError): ApiError {
     if (error.response) {
       // Server responded with error status
-      const { status, data } = error.response
+      const { status, data } = error.response as { status: number; data?: ApiErrorPayload }
       return {
-        message: data?.message || data?.detail || "An error occurred",
+        message: data?.message ?? data?.detail ?? "An error occurred",
         errors: data?.errors,
         status,
         code: data?.code,
