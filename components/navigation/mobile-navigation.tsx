@@ -1,20 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTheme } from 'next-themes'
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { 
-  Menu, 
-  Home, 
+import {
+  Menu,
+  Home,
   Play,
-  Users, 
-  MessageCircle, 
+  Users,
+  MessageCircle,
   Search,
   Bell,
   Settings,
@@ -32,6 +33,8 @@ import {
   Moon,
   Sun
 } from 'lucide-react'
+import { useAuth } from '@/contexts/auth-context'
+import { useNotifications } from '@/hooks/use-api'
 
 interface NavigationItem {
   label: string
@@ -49,101 +52,67 @@ interface NavigationSection {
 
 export function MobileNavigation() {
   const [isOpen, setIsOpen] = useState(false)
-  const [user, setUser] = useState<any>(null)
-  const [notifications, setNotifications] = useState(0)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
-
-  const navigationSections: NavigationSection[] = [
-    {
-      title: 'Discover',
-      items: [
-        { label: 'Home', href: '/', icon: Home },
-        { label: 'Watch', href: '/watch', icon: Play },
-        { label: 'Discover', href: '/discover', icon: Search },
-        { label: 'Trending', href: '/trending', icon: TrendingUp },
-      ]
-    },
-    {
-      title: 'Social',
-      items: [
-        { label: 'Friends', href: '/friends', icon: Users, requiresAuth: true },
-        { label: 'Messages', href: '/chat', icon: MessageCircle, badge: 3, requiresAuth: true },
-        { label: 'Groups', href: '/groups', icon: Users, requiresAuth: true },
-        { label: 'Events', href: '/events', icon: Calendar, requiresAuth: true },
-      ]
-    },
-    {
-      title: 'Library',
-      items: [
-        { label: 'Watch History', href: '/profile/history', icon: History, requiresAuth: true },
-        { label: 'Favorites', href: '/profile/favorites', icon: Heart, requiresAuth: true },
-        { label: 'Achievements', href: '/profile/achievements', icon: Trophy, requiresAuth: true },
-      ]
-    },
-    {
-      title: 'Account',
-      items: [
-        { label: 'Notifications', href: '/notifications', icon: Bell, badge: notifications, requiresAuth: true },
-        { label: 'Billing', href: '/billing', icon: CreditCard, requiresAuth: true },
-        { label: 'Store', href: '/store', icon: Store, premium: true },
-        { label: 'Settings', href: '/settings', icon: Settings, requiresAuth: true },
-        { label: 'Help', href: '/help', icon: HelpCircle },
-      ]
-    }
-  ]
+  const { user, isAuthenticated, logout } = useAuth()
+  const { unreadCount } = useNotifications()
+  const { resolvedTheme, setTheme, theme } = useTheme()
 
   useEffect(() => {
-    // Load user data and notifications
-    const loadUserData = async () => {
-      try {
-        const response = await fetch('/api/auth/user')
-        if (response.ok) {
-          const userData = await response.json()
-          setUser(userData)
-        }
-      } catch (error) {
-        console.error('Failed to load user data:', error)
-      }
-    }
-
-    const loadNotifications = async () => {
-      try {
-        const response = await fetch('/api/notifications/unread-count')
-        if (response.ok) {
-          const data = await response.json()
-          setNotifications(data.count)
-        }
-      } catch (error) {
-        console.error('Failed to load notifications:', error)
-      }
-    }
-
-    loadUserData()
-    if (user) loadNotifications()
-  }, [user])
-
-  useEffect(() => {
-    // Load theme preference
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' || 'light'
-    setTheme(savedTheme)
-    document.documentElement.classList.toggle('dark', savedTheme === 'dark')
+    setMounted(true)
   }, [])
 
+  const navigationSections = useMemo<NavigationSection[]>(() => {
+    const unreadBadge = unreadCount > 0 ? unreadCount : undefined
+
+    return [
+      {
+        title: 'Discover',
+        items: [
+          { label: 'Home', href: '/', icon: Home },
+          { label: 'Watch', href: '/watch', icon: Play },
+          { label: 'Discover', href: '/discover', icon: Search },
+          { label: 'Trending', href: '/trending', icon: TrendingUp },
+        ]
+      },
+      {
+        title: 'Social',
+        items: [
+          { label: 'Friends', href: '/friends', icon: Users, requiresAuth: true },
+          { label: 'Messages', href: '/chat', icon: MessageCircle, requiresAuth: true },
+          { label: 'Groups', href: '/groups', icon: Users, requiresAuth: true },
+          { label: 'Events', href: '/events', icon: Calendar, requiresAuth: true },
+        ]
+      },
+      {
+        title: 'Library',
+        items: [
+          { label: 'Watch History', href: '/profile/history', icon: History, requiresAuth: true },
+          { label: 'Favorites', href: '/profile/favorites', icon: Heart, requiresAuth: true },
+          { label: 'Achievements', href: '/profile/achievements', icon: Trophy, requiresAuth: true },
+        ]
+      },
+      {
+        title: 'Account',
+        items: [
+          { label: 'Notifications', href: '/notifications', icon: Bell, badge: unreadBadge, requiresAuth: true },
+          { label: 'Billing', href: '/billing', icon: CreditCard, requiresAuth: true },
+          { label: 'Store', href: '/store', icon: Store, premium: Boolean(user?.isPremium) },
+          { label: 'Settings', href: '/settings', icon: Settings, requiresAuth: true },
+          { label: 'Help', href: '/help', icon: HelpCircle },
+        ]
+      }
+    ]
+  }, [unreadCount, user?.isPremium])
+
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light'
-    setTheme(newTheme)
-    localStorage.setItem('theme', newTheme)
-    document.documentElement.classList.toggle('dark', newTheme === 'dark')
+    const nextTheme = (theme === 'system' ? resolvedTheme : theme) === 'light' ? 'dark' : 'light'
+    setTheme(nextTheme)
   }
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' })
-      window.location.href = '/auth/login'
-    } catch (error) {
-      console.error('Logout failed:', error)
-    }
+  const handleLogout = () => {
+    setIsOpen(false)
+    void logout()
   }
 
   const isActive = (href: string) => {
@@ -212,7 +181,7 @@ export function MobileNavigation() {
                   <div className="space-y-1 px-3">
                     {section.items.map((item) => {
                       // Skip auth-required items if not logged in
-                      if (item.requiresAuth && !user) return null
+                      if (item.requiresAuth && !isAuthenticated) return null
                       
                       const Icon = item.icon
                       const active = isActive(item.href)
@@ -253,14 +222,14 @@ export function MobileNavigation() {
 
             {/* Bottom Actions */}
             <div className="border-t p-3 space-y-1">
-              {/* Theme Toggle */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={toggleTheme}
                 className="w-full justify-start"
+                disabled={!mounted}
               >
-                {theme === 'light' ? (
+                {(theme === 'system' ? resolvedTheme : theme) === 'light' ? (
                   <>
                     <Moon className="h-4 w-4 mr-3" />
                     Dark Mode

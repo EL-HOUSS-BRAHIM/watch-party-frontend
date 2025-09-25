@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { shouldShowDashboardChrome } from '@/lib/navigation/visibility'
 
 const navigationItems = [
   {
@@ -86,27 +87,10 @@ const navigationItems = [
 
 export function CinemaNavigation() {
   const pathname = usePathname()
-  
-  // Only show navigation on dashboard pages
-  const isDashboardPage = pathname?.startsWith('/dashboard')
-  const isAuthPage = pathname?.startsWith('/(auth)') || 
-                     pathname?.includes('/login') || 
-                     pathname?.includes('/register') || 
-                     pathname?.includes('/forgot-password') ||
-                     pathname?.includes('/reset-password') ||
-                     pathname?.includes('/verify-email') ||
-                     pathname?.includes('/2fa') ||
-                     pathname?.includes('/callback')
-  const isWatchPage = pathname?.startsWith('/watch/')
-  const isAdminPage = pathname?.startsWith('/admin')
-  const isLandingPage = pathname === '/' || 
-                        pathname?.startsWith('/about') || 
-                        pathname?.startsWith('/help') || 
-                        pathname?.startsWith('/privacy') || 
-                        pathname?.startsWith('/terms')
-  
-  // Hide navigation on auth pages, watch pages, admin pages, and landing pages
-  if (isAuthPage || isWatchPage || isAdminPage || isLandingPage || !isDashboardPage) return null
+
+  if (!shouldShowDashboardChrome(pathname)) {
+    return null
+  }
 
   return (
     <nav className="fixed left-0 top-16 bottom-0 w-64 glass-sidebar border-r border-white/10 z-40 hidden lg:block">
