@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { CheckCircle, AlertCircle, Loader2, Play, Sparkles, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { AuthAPI } from "@/lib/api/auth"
+import { tokenStorage } from "@/lib/auth/token-storage"
 
 function CallbackHandler() {
   const router = useRouter()
@@ -63,13 +64,11 @@ function CallbackHandler() {
       // Exchange code for tokens
       const data = await authService.completeSocialAuth(provider, code, state || undefined)
 
-      if (data.access_token) {
-        localStorage.setItem("access_token", data.access_token)
-        localStorage.setItem("accessToken", data.access_token)
-      }
-      if (data.refresh_token) {
-        localStorage.setItem("refresh_token", data.refresh_token)
-        localStorage.setItem("refreshToken", data.refresh_token)
+      if (data.access_token || data.refresh_token) {
+        tokenStorage.setTokens({
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token,
+        })
       }
 
       const extra = data as any
@@ -89,8 +88,8 @@ function CallbackHandler() {
       })
 
       setTimeout(() => {
-        const redirectTo = localStorage.getItem("auth_redirect") || "/dashboard"
-        localStorage.removeItem("auth_redirect")
+        const redirectTo = sessionStorage.getItem("auth_redirect") || "/dashboard"
+        sessionStorage.removeItem("auth_redirect")
         router.push(redirectTo)
       }, 2000)
     } catch (error: any) {

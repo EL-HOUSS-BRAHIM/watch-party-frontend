@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
+import { tokenStorage } from "@/lib/auth/token-storage"
 import { Loader2, AlertCircle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -55,11 +56,11 @@ export function AuthCallback() {
         }
 
         // Store tokens
-        if (data.access_token) {
-          localStorage.setItem("access_token", data.access_token)
-        }
-        if (data.refresh_token) {
-          localStorage.setItem("refresh_token", data.refresh_token)
+        if (data.access_token || data.refresh_token) {
+          tokenStorage.setTokens({
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token,
+          })
         }
 
         toast({

@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { tokenStorage } from "@/lib/auth/token-storage"
 
 interface AuthGuardProps {
   children: React.ReactNode
@@ -41,15 +42,15 @@ export function AuthGuard({ children, requireAuth = true }: AuthGuardProps) {
  * Returns true if user is authenticated, false otherwise
  */
 export function useAuthGuard() {
-  const { user, isLoading } = useAuth()
-  
+  const { user, isLoading, accessToken } = useAuth()
+
   const canMakeApiCall = () => {
     return !isLoading && !!user
   }
 
   const getAuthToken = () => {
     if (!canMakeApiCall()) return null
-    return localStorage.getItem("access_token")
+    return accessToken ?? tokenStorage.getAccessToken()
   }
 
   return {

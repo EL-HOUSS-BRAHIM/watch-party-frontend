@@ -1,10 +1,11 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { AuthAPI } from "@/lib/api/auth"
 import { UsersAPI } from "@/lib/api/users"
 import type { User as APIUser, RegisterData as APIRegisterData } from "@/lib/api/types"
+import { tokenStorage } from "@/lib/auth/token-storage"
 
 // Initialize API instances directly
 const authAPI = new AuthAPI()
@@ -21,6 +22,8 @@ interface AuthContextType {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
+  accessToken: string | null
+  refreshToken: string | null
   login: (email: string, password: string) => Promise<void>
   register: (userData: RegisterData) => Promise<void>
   logout: () => void
@@ -44,9 +47,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [accessToken, setAccessToken] = useState<string | null>(tokenStorage.getAccessToken())
+  const [refreshToken, setRefreshToken] = useState<string | null>(tokenStorage.getRefreshToken())
   const router = useRouter()
 
-  const isAuthenticated = !!user
+  const isAuthenticated = useMemo(() => {
+    return !!user && !!accessToken
+  }, [user, accessToken])
+
+  // Keep local state in sync with storage updates
+  useEffect(() => {
+    const unsubscribe = tokenStorage.subscribe((nextAccessToken, nextRefreshToken) => {
+      setAccessToken(nextAccessToken)
+      setRefreshToken(nextRefreshToken)
+    })
+
+    // Ensure we hydrate tokens from sessionStorage on initial load
+    tokenStorage.syncFromStorage()
+    setAccessToken(tokenStorage.getAccessToken())
+    setRefreshToken(tokenStorage.getRefreshToken())
+
+    return unsubscribe
+  }, [])
 
   // Check for existing session on mount
   useEffect(() => {
@@ -78,8 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const token = localStorage.getItem("access_token") ?? localStorage.getItem("accessToken")
-      if (!token) {
+      if (!tokenStorage.hasAccessToken()) {
         setIsLoading(false)
         return
       }
@@ -88,12 +109,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser({ ...userData, avatar: userData.avatar || undefined })
     } catch (error) {
       console.error("Auth check failed:", error)
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem("access_token")
-        localStorage.removeItem("refresh_token")
-        localStorage.removeItem("accessToken")
-        localStorage.removeItem("refreshToken")
-      }
+      tokenStorage.clearTokens()
+      setAccessToken(null)
+      setRefreshToken(null)
+      setUser(null)
     } finally {
       setIsLoading(false)
     }
@@ -103,17 +122,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await authAPI.login({ email, password })
 
-      if (typeof window !== 'undefined') {
-        localStorage.setItem("access_token", response.access_token)
-        localStorage.setItem("refresh_token", response.refresh_token)
-        localStorage.setItem("accessToken", response.access_token)
-        localStorage.setItem("refreshToken", response.refresh_token)
-      }
-      
-      const user = { 
-        ...response.user, 
+      tokenStorage.setTokens({
+        accessToken: response.access_token,
+        refreshToken: response.refresh_token,
+      })
+
+      const user = {
+        ...response.user,
         avatar: response.user.avatar || undefined,
-        role: ("user" as "user" | "admin" | "moderator") // Default role, could be determined from backend
+        role: response.user.role,
       }
       setUser(user)
 
@@ -135,16 +152,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Auto-login after successful registration
       if (response.access_token && response.refresh_token) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem("access_token", response.access_token)
-          localStorage.setItem("refresh_token", response.refresh_token)
-          localStorage.setItem("accessToken", response.access_token)
-          localStorage.setItem("refreshToken", response.refresh_token)
-        }
-        setUser({ 
-          ...response.user, 
+        tokenStorage.setTokens({
+          accessToken: response.access_token,
+          refreshToken: response.refresh_token,
+        })
+        setUser({
+          ...response.user,
           avatar: response.user.avatar || undefined,
-          role: ("user" as "user" | "admin" | "moderator")
+          role: response.user.role,
         })
         router.push("/dashboard")
       } else {
@@ -163,12 +178,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Continue with logout even if API call fails
       console.error("Logout API call failed:", error)
     } finally {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem("access_token")
-        localStorage.removeItem("refresh_token")
-        localStorage.removeItem("accessToken")
-        localStorage.removeItem("refreshToken")
-      }
+      tokenStorage.clearTokens()
+      setAccessToken(null)
+      setRefreshToken(null)
       setUser(null)
       router.push("/login")
     }
@@ -242,26 +254,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Cannot refresh token on server side")
       }
 
-      const refreshToken =
-        localStorage.getItem("refresh_token") ?? localStorage.getItem("refreshToken")
-      if (!refreshToken) {
+      const currentRefreshToken = tokenStorage.getRefreshToken()
+      if (!currentRefreshToken) {
         throw new Error("No refresh token available")
       }
 
       const response = await authAPI.refreshToken()
-      localStorage.setItem("access_token", response.access)
-      localStorage.setItem("accessToken", response.access)
+      tokenStorage.setTokens({ accessToken: response.access, refreshToken: currentRefreshToken })
 
       // Get updated user data
       const userData = await authAPI.getProfile()
       setUser({ ...userData, avatar: userData.avatar || undefined })
     } catch (error) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem("access_token")
-        localStorage.removeItem("accessToken")
-        localStorage.removeItem("refresh_token")
-        localStorage.removeItem("refreshToken")
-      }
+      tokenStorage.clearTokens()
+      setAccessToken(null)
+      setRefreshToken(null)
       setUser(null)
       throw error
     }
@@ -295,8 +302,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = async () => {
     try {
       setIsLoading(true)
-      const token = localStorage.getItem("access_token") ?? localStorage.getItem("accessToken")
-      if (token) {
+      if (tokenStorage.hasAccessToken()) {
         const userData = await authAPI.getProfile()
         setUser(userData)
       }
@@ -323,6 +329,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateProfile,
     updateUser,
     refreshUser,
+    accessToken,
+    refreshToken,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

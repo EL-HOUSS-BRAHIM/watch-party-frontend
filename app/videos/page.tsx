@@ -13,6 +13,7 @@ import { useVideos } from "@/hooks/use-api"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { useAuthToken, isAuthTokenError } from "@/hooks/use-auth-token"
 import {
   Plus,
   Search,
@@ -52,6 +53,7 @@ interface Video {
 export default function VideosPage() {
   const router = useRouter()
   const { user } = useAuth()
+  const { ensureAccessToken } = useAuthToken()
   const { toast } = useToast()
   
   const [searchQuery, setSearchQuery] = useState("")
@@ -71,7 +73,7 @@ export default function VideosPage() {
     }
 
     try {
-      const token = localStorage.getItem("accessToken")
+      const token = ensureAccessToken()
       const response = await fetch(`/api/videos/${videoId}/`, {
         method: "DELETE",
         headers: {
@@ -89,6 +91,14 @@ export default function VideosPage() {
         throw new Error("Failed to delete video")
       }
     } catch (error) {
+      if (isAuthTokenError(error)) {
+        toast({
+          title: "Session expired",
+          description: "Please sign in again to manage your videos.",
+          variant: "destructive",
+        })
+        return
+      }
       console.error("Failed to delete video:", error)
       toast({
         title: "Error",

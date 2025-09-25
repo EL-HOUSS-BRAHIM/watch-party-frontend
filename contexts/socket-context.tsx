@@ -2,6 +2,9 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode, useCallback, useRef } from "react"
 import { useAuth } from "./auth-context"
+import { environment } from "@/lib/config/env"
+import { tokenStorage } from "@/lib/auth/token-storage"
+import { logger } from "@/lib/observability/logger"
 
 interface SocketContextType {
   socket: WebSocket | null
@@ -25,7 +28,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [messageCallbacks, setMessageCallbacks] = useState<Set<(data: any) => void>>(new Set())
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
   const [currentRoom, setCurrentRoom] = useState<string | null>(null)
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, accessToken } = useAuth()
   
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
@@ -49,22 +52,28 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     setConnectionStatus("connecting")
 
-    const token = localStorage.getItem("access_token")
-    
+    const token = accessToken || tokenStorage.getAccessToken()
+
     // Don't connect if no token is available
     if (!token) {
-      console.log("No authentication token available, skipping WebSocket connection")
+      logger.warn("websocket.auth_missing", { reason: "No access token available" })
       setConnectionStatus("disconnected")
       return
     }
-    
-    const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws"}?token=${token}`
 
-    const newSocket = new WebSocket(wsUrl)
+    const wsUrl = (() => {
+      try {
+        return new URL(environment.websocketUrl).toString()
+      } catch {
+        return environment.websocketUrl
+      }
+    })()
+
+    const newSocket = new WebSocket(wsUrl, [`bearer`, `token.${token}`])
     socketRef.current = newSocket
 
     newSocket.onopen = () => {
-      console.log("WebSocket connected")
+      logger.info("websocket.connected")
       setIsConnected(true)
       setConnectionStatus("connected")
       setReconnectAttempts(0)
@@ -89,21 +98,29 @@ export function SocketProvider({ children }: { children: ReactNode }) {
           return currentCallbacks
         })
       } catch (error) {
-        console.error("Failed to parse WebSocket message:", error)
+        logger.error("websocket.message_parse_failed", {
+          message: error instanceof Error ? error.message : "Unknown error",
+        })
       }
     }
 
     newSocket.onclose = (event) => {
-      console.log("WebSocket disconnected:", event.code, event.reason)
+      logger.warn("websocket.disconnected", {
+        code: event.code,
+        reason: event.reason,
+      })
       setIsConnected(false)
       setConnectionStatus("disconnected")
       setSocket(null)
 
       // Attempt to reconnect if it wasn't a manual close and we're still authenticated
       if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts && isAuthenticated) {
-        const delay = reconnectDelay * Math.pow(2, reconnectAttempts)
-        console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`)
-        
+        const delay = Math.min(5000, reconnectDelay * Math.pow(2, reconnectAttempts))
+        logger.info("websocket.reconnect_scheduled", {
+          attempt: reconnectAttempts + 1,
+          delay,
+        })
+
         reconnectTimeoutRef.current = setTimeout(() => {
           setReconnectAttempts((prev) => prev + 1)
           connect()
@@ -112,10 +129,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     }
 
     newSocket.onerror = (error) => {
-      console.error("WebSocket error:", error)
+      logger.error("websocket.error", { error })
       setConnectionStatus("error")
     }
-  }, [isAuthenticated, user, reconnectAttempts, currentRoom])
+  }, [isAuthenticated, user, reconnectAttempts, currentRoom, accessToken])
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {

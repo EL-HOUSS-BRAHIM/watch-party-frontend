@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Shield, AlertCircle, ArrowLeft } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { authAPI } from "@/lib/api"
+import { tokenStorage } from "@/lib/auth/token-storage"
 
 export function TwoFactorVerify() {
   const [code, setCode] = useState("")
@@ -48,13 +49,11 @@ export function TwoFactorVerify() {
         throw new Error(response?.message || "Invalid verification code")
       }
 
-      if (response.access_token) {
-        localStorage.setItem("access_token", response.access_token)
-        localStorage.setItem("accessToken", response.access_token)
-      }
-      if (response.refresh_token) {
-        localStorage.setItem("refresh_token", response.refresh_token)
-        localStorage.setItem("refreshToken", response.refresh_token)
+      if (response.access_token || response.refresh_token) {
+        tokenStorage.setTokens({
+          accessToken: response.access_token,
+          refreshToken: response.refresh_token,
+        })
       }
 
       toast({

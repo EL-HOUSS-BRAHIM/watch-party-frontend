@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
+import "@/lib/auth/token-storage"
 import { CinemaHeader } from "@/components/layout/cinema-header"
 import { CinemaNavigation } from "@/components/layout/cinema-navigation"
 import { CinemaFooter } from "@/components/layout/cinema-footer"
