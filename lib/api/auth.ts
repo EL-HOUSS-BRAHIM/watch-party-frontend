@@ -5,6 +5,8 @@
 
 import { apiClient } from "./client"
 import { API_ENDPOINTS } from "./endpoints"
+import { tokenStorage } from "@/lib/auth/token-storage"
+import { environment, isBrowser } from "@/lib/config/env"
 import type {
   AuthResponse,
   LoginCredentials,
@@ -37,11 +39,7 @@ export class AuthAPI {
    * Logout user and blacklist refresh token
    */
   async logout(): Promise<APIResponse> {
-    // Only access localStorage on client side
-    const refreshToken =
-      typeof window !== 'undefined'
-        ? localStorage.getItem("refresh_token") ?? localStorage.getItem("refreshToken")
-        : null
+    const refreshToken = tokenStorage.getRefreshToken()
     return apiClient.post<APIResponse>(API_ENDPOINTS.auth.logout, {
       refresh_token: refreshToken,
     })
@@ -51,13 +49,11 @@ export class AuthAPI {
    * Refresh access token
    */
   async refreshToken(): Promise<{ access: string }> {
-    // Only access localStorage on client side
-    if (typeof window === 'undefined') {
+    if (!isBrowser) {
       throw new Error("Cannot refresh token on server side")
     }
 
-    const refreshToken =
-      localStorage.getItem("refresh_token") ?? localStorage.getItem("refreshToken")
+    const refreshToken = tokenStorage.getRefreshToken()
     if (!refreshToken) {
       throw new Error("No refresh token available")
     }
@@ -175,9 +171,9 @@ export class AuthAPI {
    * Social Authentication - Get auth URL
    */
   async getSocialAuthUrl(provider: 'google' | 'github', redirectUri?: string): Promise<{ redirect_url: string }> {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+    const baseURL = environment.apiBaseUrl
     const defaultRedirectUri = `${window.location.origin}/callback?provider=${provider}`
-    
+
     const response = await fetch(`${baseURL}/api/auth/social/${provider}/redirect/`, {
       method: "POST",
       headers: {

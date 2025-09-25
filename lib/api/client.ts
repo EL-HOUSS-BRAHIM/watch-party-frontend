@@ -1,5 +1,15 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosError } from "axios"
 import { API_ENDPOINTS } from "./endpoints"
+import { environment, isBrowser } from "@/lib/config/env"
+import { tokenStorage } from "@/lib/auth/token-storage"
+import { logger } from "@/lib/observability/logger"
+
+declare module "axios" {
+  interface InternalAxiosRequestConfig<D = any> {
+    metadata?: { startTime?: number }
+    _retry?: boolean
+  }
+}
 
 // Types
 export interface ApiResponse<T = any> {
@@ -26,8 +36,8 @@ export interface ApiError {
 }
 
 // Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws"
+const API_BASE_URL = environment.apiBaseUrl
+const MAX_RETRY_DELAY = 5000
 
 // Request timeout in milliseconds
 const REQUEST_TIMEOUT = 30000
@@ -63,11 +73,16 @@ class ApiClient {
         }
 
         // Add request timestamp for debugging
-        config.metadata = { startTime: new Date() }
+        config.metadata = { startTime: Date.now() }
+        logger.debug("api.request", {
+          method: config.method,
+          url: config.url,
+        })
 
         return config
       },
       (error) => {
+        logger.error("api.request_error", { message: error.message })
         return Promise.reject(this.handleError(error))
       },
     )
@@ -76,14 +91,14 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => {
         // Log response time in development
-        if (process.env.NODE_ENV === "development") {
-          const endTime = new Date()
-          const startTime = response.config.metadata?.startTime
-          if (startTime) {
-            const duration = endTime.getTime() - startTime.getTime()
-            console.log(`API Request: ${response.config.method?.toUpperCase()} ${response.config.url} - ${duration}ms`)
-          }
-        }
+        const startTime = response.config.metadata?.startTime
+        const duration = typeof startTime === "number" ? Date.now() - startTime : undefined
+        logger.info("api.response", {
+          method: response.config.method,
+          url: response.config.url,
+          status: response.status,
+          duration,
+        })
 
         return response
       },
@@ -99,9 +114,15 @@ class ApiClient {
             const token = this.getAuthToken()
             if (token) {
               originalRequest.headers.Authorization = `Bearer ${token}`
+              logger.info("api.retry_after_refresh", {
+                url: originalRequest.url,
+              })
               return this.client(originalRequest)
             }
           } catch (refreshError) {
+            logger.error("api.refresh_failed", {
+              message: refreshError instanceof Error ? refreshError.message : "Unknown error",
+            })
             this.handleAuthError()
             return Promise.reject(this.handleError(error))
           }
@@ -117,32 +138,39 @@ class ApiClient {
             originalRequest._retry = true
 
             // Exponential backoff
-            const delay = RETRY_DELAY * Math.pow(2, currentRetries)
+            const delay = Math.min(MAX_RETRY_DELAY, RETRY_DELAY * Math.pow(2, currentRetries))
+            logger.warn("api.retry", {
+              attempt: currentRetries + 1,
+              url: originalRequest.url,
+              delay,
+            })
             await new Promise((resolve) => setTimeout(resolve, delay))
 
             return this.client(originalRequest)
           } else {
             this.retryCount.delete(retryKey)
+            logger.error("api.retry_exhausted", {
+              url: originalRequest.url,
+            })
           }
         }
 
+        logger.error("api.response_error", {
+          status: error.response?.status,
+          url: originalRequest?.url,
+          message: error.message,
+        })
         return Promise.reject(this.handleError(error))
       },
     )
   }
 
   private getAuthToken(): string | null {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("access_token") ?? localStorage.getItem("accessToken")
-    }
-    return null
+    return tokenStorage.getAccessToken()
   }
 
   private async refreshToken(): Promise<void> {
-    const refreshToken =
-      typeof window !== "undefined"
-        ? localStorage.getItem("refresh_token") ?? localStorage.getItem("refreshToken")
-        : null
+    const refreshToken = tokenStorage.getRefreshToken()
 
     if (!refreshToken) {
       throw new Error("No refresh token available")
@@ -155,34 +183,22 @@ class ApiClient {
 
       const { access, refresh } = response.data
 
-      if (typeof window !== "undefined") {
-        localStorage.setItem("access_token", access)
-        localStorage.setItem("accessToken", access)
-        if (refresh) {
-          localStorage.setItem("refresh_token", refresh)
-          localStorage.setItem("refreshToken", refresh)
-        }
-      }
+      tokenStorage.setTokens({
+        accessToken: access,
+        refreshToken: refresh ?? refreshToken,
+      })
     } catch (error) {
       // Clear tokens on refresh failure
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("access_token")
-        localStorage.removeItem("accessToken")
-        localStorage.removeItem("refresh_token")
-        localStorage.removeItem("refreshToken")
-      }
+      tokenStorage.clearTokens()
       throw error
     }
   }
 
   private handleAuthError(): void {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token")
-      localStorage.removeItem("accessToken")
-      localStorage.removeItem("refresh_token")
-      localStorage.removeItem("refreshToken")
+    tokenStorage.clearTokens()
 
-      // Redirect to login page
+    // Redirect to login page
+    if (isBrowser) {
       window.location.href = "/login"
     }
   }
@@ -300,25 +316,28 @@ class ApiClient {
   }
 
   // WebSocket connection
-  createWebSocket(endpoint: string, protocols?: string[]): WebSocket {
+  createWebSocket(endpoint: string, protocols: string[] = []): WebSocket {
     const token = this.getAuthToken()
-    const wsUrl = `${WS_BASE_URL}${endpoint}${token ? `?token=${token}` : ""}`
+    const negotiatedProtocols = token ? [...protocols, `auth.token.${token}`] : protocols
 
-    return new WebSocket(wsUrl, protocols)
+    const target = (() => {
+      try {
+        return new URL(endpoint, `${environment.websocketUrl}/`).toString()
+      } catch {
+        return `${environment.websocketUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`
+      }
+    })()
+
+    return new WebSocket(target, negotiatedProtocols)
   }
 
   // Utility methods
   setAuthToken(token: string): void {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("access_token", token)
-    }
+    tokenStorage.setTokens({ accessToken: token, refreshToken: tokenStorage.getRefreshToken() })
   }
 
   clearAuthToken(): void {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token")
-      localStorage.removeItem("refresh_token")
-    }
+    tokenStorage.clearTokens()
   }
 
   // Health check

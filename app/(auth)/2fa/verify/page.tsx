@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { AuthAPI } from "@/lib/api/auth"
+import { tokenStorage } from "@/lib/auth/token-storage"
 
 function TwoFactorVerifyForm() {
   const router = useRouter()
@@ -149,13 +150,11 @@ function TwoFactorVerifyForm() {
         })
       }
 
-      if (response.access_token) {
-        localStorage.setItem("access_token", response.access_token)
-        localStorage.setItem("accessToken", response.access_token)
-      }
-      if (response.refresh_token) {
-        localStorage.setItem("refresh_token", response.refresh_token)
-        localStorage.setItem("refreshToken", response.refresh_token)
+      if (response.access_token || response.refresh_token) {
+        tokenStorage.setTokens({
+          accessToken: response.access_token,
+          refreshToken: response.refresh_token,
+        })
       }
 
       toast({
