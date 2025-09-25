@@ -3,7 +3,7 @@
  * Handles customer support, FAQ, tickets, and feedback
  */
 
-import { apiClient } from "./client"
+import { apiClient, type ApiClient } from "./client"
 import { API_ENDPOINTS } from "./endpoints"
 import type {
   FAQCategory,
@@ -16,11 +16,13 @@ import type {
 } from "./types"
 
 export class SupportAPI {
+  constructor(private readonly client: ApiClient = apiClient) {}
+
   /**
    * Get FAQ categories
    */
   async getFAQCategories(): Promise<FAQCategory[]> {
-    return apiClient.get<FAQCategory[]>(API_ENDPOINTS.support.faqCategories)
+    return this.client.get<FAQCategory[]>(API_ENDPOINTS.support.faqCategories)
   }
 
   /**
@@ -31,7 +33,54 @@ export class SupportAPI {
     page?: number
     search?: string
   }): Promise<PaginatedResponse<FAQ>> {
-    return apiClient.get<PaginatedResponse<FAQ>>(API_ENDPOINTS.support.faq, { params })
+    return this.client.get<PaginatedResponse<FAQ>>(API_ENDPOINTS.support.faq, { params })
+  }
+
+  /**
+   * Create a new FAQ entry
+   */
+  async createFAQ(data: {
+    question: string
+    answer: string
+    category: string
+    tags?: string[]
+    is_published?: boolean
+    order?: number
+  }): Promise<FAQ> {
+    return this.client.post<FAQ>(API_ENDPOINTS.support.faq, data)
+  }
+
+  /**
+   * Update an existing FAQ entry
+   */
+  async updateFAQ(
+    faqId: string,
+    data: Partial<{
+      question: string
+      answer: string
+      category: string
+      tags: string[]
+      is_published: boolean
+      order: number
+    }>,
+  ): Promise<FAQ> {
+    return this.client.put<FAQ>(API_ENDPOINTS.support.faqDetail(faqId), data)
+  }
+
+  /**
+   * Delete an FAQ
+   */
+  async deleteFAQ(faqId: string): Promise<APIResponse> {
+    return this.client.delete<APIResponse>(API_ENDPOINTS.support.faqDetail(faqId))
+  }
+
+  /**
+   * Reorder FAQs in bulk
+   */
+  async reorderFAQs(
+    order: Array<{ id: string; order: number }>,
+  ): Promise<APIResponse> {
+    return this.client.post<APIResponse>(API_ENDPOINTS.support.faqReorder, { items: order })
   }
 
   /**

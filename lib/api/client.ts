@@ -46,20 +46,47 @@ const REQUEST_TIMEOUT = 30000
 const MAX_RETRIES = 3
 const RETRY_DELAY = 1000
 
-class ApiClient {
+export interface ApiClientOptions {
+  /**
+   * Override the default API base URL. Useful for testing or local proxies.
+   */
+  baseURL?: string
+
+  /**
+   * Override the request timeout in milliseconds.
+   */
+  timeout?: number
+}
+
+export class ApiClient {
   private client: AxiosInstance
   private retryCount: Map<string, number> = new Map()
 
-  constructor() {
+  constructor(options: ApiClientOptions = {}) {
     this.client = axios.create({
-      baseURL: API_BASE_URL,
-      timeout: REQUEST_TIMEOUT,
+      baseURL: options.baseURL ?? API_BASE_URL,
+      timeout: options.timeout ?? REQUEST_TIMEOUT,
       headers: {
         "Content-Type": "application/json",
       },
     })
 
     this.setupInterceptors()
+  }
+
+  /**
+   * Allows callers (primarily tests) to override runtime configuration such as the
+   * base URL or timeout without re-instantiating the entire client. This keeps the
+   * shared interceptors intact while pointing requests at a mock server.
+   */
+  configure(options: ApiClientOptions = {}): void {
+    if (options.baseURL) {
+      this.client.defaults.baseURL = options.baseURL
+    }
+
+    if (typeof options.timeout === "number") {
+      this.client.defaults.timeout = options.timeout
+    }
   }
 
   private setupInterceptors() {

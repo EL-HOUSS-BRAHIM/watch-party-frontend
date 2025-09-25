@@ -13,6 +13,7 @@ import { useDropzone } from "react-dropzone"
 import { Upload, File, CheckCircle, AlertCircle, Cloud, HardDrive } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useApi } from "@/hooks/use-api"
+import { integrationsAPI } from "@/lib/api"
 
 interface UploadProgress {
   loaded: number
@@ -104,8 +105,8 @@ export function VideoUpload() {
 
   const connectGoogleDrive = async () => {
     try {
-      const response = await api.get('/integrations/google-drive/auth-url/')
-      window.location.href = response.data.auth_url
+      const { auth_url } = await integrationsAPI.getGoogleDriveAuthUrl()
+      window.location.assign(auth_url)
     } catch (err) {
       toast({
         title: "Error",
@@ -330,7 +331,7 @@ export function VideoUpload() {
                   Access your videos stored in Google Drive and upload them directly to Watch Party
                 </p>
               </div>
-              <Button onClick={connectGoogleDrive}>
+              <Button onClick={connectGoogleDrive} data-testid="connect-google-drive-upload">
                 Connect Google Drive
               </Button>
             </CardContent>

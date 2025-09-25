@@ -1,324 +1,346 @@
 'use client'
 
-import { useState } from 'react'
-import { 
-  Cog6ToothIcon,
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
   LinkIcon,
+  ArrowPathIcon,
   CheckCircleIcon,
   XMarkIcon,
-  PlusIcon,
+  ExclamationTriangleIcon,
   CloudIcon,
-  VideoCameraIcon,
-  MusicalNoteIcon,
-  ChatBubbleLeftRightIcon
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline'
+import { integrationsAPI } from '@/lib/api'
+import type {
+  HealthStatus,
+  IntegrationConnection,
+  IntegrationDefinition,
+  IntegrationStatusOverview,
+} from '@/lib/api'
+import { useToast } from '@/hooks/use-toast'
+import { LoadingSpinner } from '@/components/ui/loading'
 
-interface Integration {
-  id: string
-  name: string
-  description: string
-  icon: React.ReactNode
-  isConnected: boolean
-  connectedAt?: string
-  permissions: string[]
-  status: 'active' | 'error' | 'pending'
-  errorMessage?: string
+interface IntegrationDisplay {
+  definition: IntegrationDefinition
+  connection: IntegrationConnection | null
+  status?: IntegrationStatusOverview
 }
 
-const availableIntegrations: Integration[] = [
-  {
-    id: 'google-drive',
-    name: 'Google Drive',
-    description: 'Store and sync your videos with Google Drive',
-    icon: <CloudIcon className="w-6 h-6" />,
-    isConnected: true,
-    connectedAt: '2024-03-15',
-    permissions: ['Read files', 'Upload files', 'Manage folders'],
-    status: 'active'
-  },
-  {
-    id: 'youtube',
-    name: 'YouTube',
-    description: 'Import videos from your YouTube channel',
-    icon: <VideoCameraIcon className="w-6 h-6" />,
-    isConnected: false,
-    permissions: ['Read channel data', 'Access video library'],
-    status: 'pending'
-  },
-  {
-    id: 'spotify',
-    name: 'Spotify',
-    description: 'Sync music for watch party soundtracks',
-    icon: <MusicalNoteIcon className="w-6 h-6" />,
-    isConnected: true,
-    connectedAt: '2024-02-20',
-    permissions: ['Read playlists', 'Control playback'],
-    status: 'error',
-    errorMessage: 'Authentication expired. Please reconnect.'
-  },
-  {
-    id: 'discord',
-    name: 'Discord',
-    description: 'Send watch party notifications to Discord servers',
-    icon: <ChatBubbleLeftRightIcon className="w-6 h-6" />,
-    isConnected: false,
-    permissions: ['Send messages', 'Create invites'],
-    status: 'pending'
-  }
-]
+const PROVIDER_ICON_MAP: Record<string, ReactNode> = {
+  google_drive: <CloudIcon className="w-6 h-6" />,
+  discord: <ChatBubbleLeftRightIcon className="w-6 h-6" />,
+}
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'active':
+function getStatusColor(status: IntegrationStatusOverview | undefined) {
+  switch (status?.status) {
+    case 'available':
       return 'text-green-400'
-    case 'error':
+    case 'degraded':
+      return 'text-yellow-400'
+    case 'unavailable':
       return 'text-red-400'
     default:
-      return 'text-yellow-400'
+      return 'text-blue-400'
   }
 }
 
-const getStatusIcon = (status: string) => {
-  switch (status) {
-    case 'active':
-      return <CheckCircleIcon className="w-5 h-5" />
-    case 'error':
-      return <XMarkIcon className="w-5 h-5" />
-    default:
-      return <Cog6ToothIcon className="w-5 h-5 animate-spin" />
-  }
+function getConnectionBadge(connection: IntegrationConnection | null) {
+  if (!connection) return { text: 'Not connected', className: 'text-yellow-400 border-yellow-400/40' }
+  if (connection.status === 'error') return { text: 'Error', className: 'text-red-400 border-red-400/40' }
+  if (connection.status === 'pending') return { text: 'Pending', className: 'text-blue-400 border-blue-400/40' }
+  return { text: 'Connected', className: 'text-green-400 border-green-400/40' }
 }
 
 export default function IntegrationsPage() {
-  const [integrations, setIntegrations] = useState(availableIntegrations)
-  const [showDisconnectModal, setShowDisconnectModal] = useState<string | null>(null)
+  const [definitions, setDefinitions] = useState<IntegrationDefinition[]>([])
+  const [connections, setConnections] = useState<IntegrationConnection[]>([])
+  const [status, setStatus] = useState<Record<string, IntegrationStatusOverview>>({})
+  const [health, setHealth] = useState<HealthStatus | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [actionProvider, setActionProvider] = useState<string | null>(null)
+  const { toast } = useToast()
 
-  const handleConnect = async (integrationId: string) => {
-    // In real app, this would trigger OAuth flow
-    console.log('Connecting to:', integrationId)
-    
-    // Simulate OAuth process
-    setIntegrations(prev => prev.map(integration => 
-      integration.id === integrationId 
-        ? { ...integration, status: 'pending' as const }
-        : integration
-    ))
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [definitionsResponse, connectionsResponse, statusResponse, healthResponse] = await Promise.all([
+        integrationsAPI.getIntegrationTypes(),
+        integrationsAPI.getConnections(),
+        integrationsAPI.getStatus().catch(() => ({ integrations: [] })),
+        integrationsAPI.getHealth().catch(() => null),
+      ])
 
-    // Simulate successful connection after delay
-    setTimeout(() => {
-      setIntegrations(prev => prev.map(integration => 
-        integration.id === integrationId 
-          ? { 
-              ...integration, 
-              isConnected: true, 
-              status: 'active' as const,
-              connectedAt: new Date().toISOString().split('T')[0]
-            }
-          : integration
-      ))
-    }, 2000)
+      setDefinitions(definitionsResponse.integrations || [])
+      setConnections(connectionsResponse.connections || [])
+
+      const mappedStatus: Record<string, IntegrationStatusOverview> = {}
+      for (const entry of statusResponse.integrations || []) {
+        mappedStatus[entry.provider] = entry
+      }
+      setStatus(mappedStatus)
+      setHealth(healthResponse)
+    } catch (error) {
+      console.error('Failed to load integrations data', error)
+      toast({
+        title: 'Unable to load integrations',
+        description: 'Check your network connection and try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  const connectionFor = useCallback(
+    (provider: string) => connections.find(connection => connection.provider === provider) || null,
+    [connections]
+  )
+
+  const handleConnect = async (provider: string) => {
+    setActionProvider(provider)
+    try {
+      const isGoogleDrive = provider === 'google_drive'
+      const { auth_url } = isGoogleDrive
+        ? await integrationsAPI.getGoogleDriveAuthUrl()
+        : await integrationsAPI.getAuthUrl(provider)
+
+      window.location.assign(auth_url)
+    } catch (error) {
+      console.error('Failed to start integration authorization', error)
+      toast({
+        title: 'Connection failed',
+        description: 'We were unable to start the authorization flow. Try again later.',
+        variant: 'destructive',
+      })
+    } finally {
+      setActionProvider(null)
+    }
   }
 
-  const handleDisconnect = (integrationId: string) => {
-    setIntegrations(prev => prev.map(integration => 
-      integration.id === integrationId 
-        ? { 
-            ...integration, 
-            isConnected: false, 
-            status: 'pending' as const,
-            connectedAt: undefined,
-            errorMessage: undefined
-          }
-        : integration
-    ))
-    setShowDisconnectModal(null)
+  const handleDisconnect = async (provider: string) => {
+    const connection = connectionFor(provider)
+    if (!connection) return
+
+    setActionProvider(provider)
+    try {
+      await integrationsAPI.disconnectConnection(connection.id)
+      toast({
+        title: `${connection.display_name || provider} disconnected`,
+        description: 'The integration has been disconnected from your account.',
+      })
+      await loadData()
+    } catch (error) {
+      console.error('Failed to disconnect integration', error)
+      toast({
+        title: 'Unable to disconnect',
+        description: 'We could not disconnect the integration. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setActionProvider(null)
+    }
   }
 
-  const handleReconnect = (integrationId: string) => {
-    handleConnect(integrationId)
-  }
+  const displays: IntegrationDisplay[] = useMemo(() => {
+    return definitions.map(definition => ({
+      definition,
+      connection: connectionFor(definition.provider),
+      status: status[definition.provider],
+    }))
+  }, [definitions, connectionFor, status])
+
+  const connectedCount = useMemo(
+    () => connections.filter(connection => connection.status === 'connected').length,
+    [connections]
+  )
+
+  const issueCount = useMemo(
+    () => connections.filter(connection => connection.status === 'error').length,
+    [connections]
+  )
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        {/* Header */}
-        <div className="mb-12">
-          <div className="flex items-center gap-3 mb-4">
-            <LinkIcon className="w-8 h-8 text-purple-400" />
+      <div className="max-w-5xl mx-auto px-4 py-12 space-y-12">
+        <header className="space-y-4">
+          <div className="flex items-center gap-3">
+            <LinkIcon className="w-8 h-8 text-purple-300" />
             <h1 className="text-4xl font-bold text-white">Integrations</h1>
           </div>
-          <p className="text-white/70 text-lg">
-            Connect WatchParty with your favorite services to enhance your experience
+          <p className="text-white/70 text-lg max-w-2xl">
+            Connect Watch Party to the services your community relies on. Authorize providers, monitor health, and manage
+            connections from a single control center.
           </p>
-        </div>
+        </header>
 
-        {/* Connected Services Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 text-center">
-            <div className="text-3xl font-bold text-green-400 mb-2">
-              {integrations.filter(i => i.isConnected && i.status === 'active').length}
-            </div>
-            <div className="text-white/70">Active Connections</div>
+        {loading ? (
+          <div className="flex items-center gap-3 text-white/70">
+            <LoadingSpinner />
+            Loading integrations…
           </div>
-          
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 text-center">
-            <div className="text-3xl font-bold text-red-400 mb-2">
-              {integrations.filter(i => i.status === 'error').length}
-            </div>
-            <div className="text-white/70">Need Attention</div>
-          </div>
-          
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 text-center">
-            <div className="text-3xl font-bold text-blue-400 mb-2">
-              {integrations.filter(i => !i.isConnected).length}
-            </div>
-            <div className="text-white/70">Available</div>
-          </div>
-        </div>
+        ) : (
+          <>
+            <section className="grid grid-cols-1 gap-6 md:grid-cols-3" data-testid="integration-summary">
+              <div className="rounded-xl border border-white/10 bg-white/10 p-6 text-white shadow-sm backdrop-blur">
+                <p className="text-sm text-white/70">Connected integrations</p>
+                <p className="mt-2 text-3xl font-semibold">{connectedCount}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/10 p-6 text-white shadow-sm backdrop-blur">
+                <p className="text-sm text-white/70">Available providers</p>
+                <p className="mt-2 text-3xl font-semibold">{definitions.length}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/10 p-6 text-white shadow-sm backdrop-blur">
+                <p className="text-sm text-white/70">Connections needing attention</p>
+                <p className={`mt-2 text-3xl font-semibold ${issueCount ? 'text-red-300' : ''}`}>{issueCount}</p>
+              </div>
+            </section>
 
-        {/* Integrations List */}
-        <div className="space-y-6">
-          {integrations.map(integration => (
-            <div
-              key={integration.id}
-              className="bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 p-6"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-white/10 rounded-lg">
-                    {integration.icon}
-                  </div>
-                  
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-bold text-white text-lg">{integration.name}</h3>
-                      <div className={`flex items-center gap-1 ${getStatusColor(integration.status)}`}>
-                        {getStatusIcon(integration.status)}
-                        <span className="text-sm font-medium capitalize">{integration.status}</span>
-                      </div>
-                    </div>
-                    
-                    <p className="text-white/70 mb-4">{integration.description}</p>
-                    
-                    {/* Error Message */}
-                    {integration.errorMessage && (
-                      <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 mb-4">
-                        <p className="text-red-200 text-sm">{integration.errorMessage}</p>
-                      </div>
-                    )}
-                    
-                    {/* Connection Details */}
-                    {integration.isConnected && integration.connectedAt && (
-                      <div className="text-sm text-white/60 mb-4">
-                        Connected on {new Date(integration.connectedAt).toLocaleDateString()}
-                      </div>
-                    )}
-                    
-                    {/* Permissions */}
-                    <div className="mb-4">
-                      <h4 className="text-sm font-medium text-white/80 mb-2">Permissions:</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {integration.permissions.map((permission, index) => (
-                          <span
-                            key={index}
-                            className="px-2 py-1 bg-white/10 rounded text-xs text-white/70"
-                          >
-                            {permission}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex flex-col gap-2">
-                  {integration.isConnected ? (
-                    <>
-                      {integration.status === 'error' && (
-                        <button
-                          onClick={() => handleReconnect(integration.id)}
-                          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
-                        >
-                          Reconnect
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setShowDisconnectModal(integration.id)}
-                        className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
-                      >
-                        Disconnect
-                      </button>
-                      {integration.id === 'google-drive' && (
-                        <button className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-colors">
-                          Settings
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => handleConnect(integration.id)}
-                      disabled={integration.status === 'pending'}
-                      className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-purple-500/50 text-white rounded-lg font-medium transition-colors"
+            {health && (
+              <section className="rounded-xl border border-white/10 bg-white/10 p-6 text-white shadow-sm backdrop-blur">
+                <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  <ArrowPathIcon className="w-5 h-5" /> Integration health
+                </h2>
+                <p className="text-sm text-white/70 mb-4">
+                  {health.status === 'healthy'
+                    ? 'All third-party services are responding normally.'
+                    : 'Some third-party services are reporting degraded performance.'}
+                </p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {health.services?.map(service => (
+                    <div
+                      key={service.name}
+                      className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-3"
                     >
-                      {integration.status === 'pending' ? (
-                        <>
-                          <Cog6ToothIcon className="w-4 h-4 animate-spin" />
-                          Connecting...
-                        </>
-                      ) : (
-                        <>
-                          <PlusIcon className="w-4 h-4" />
-                          Connect
-                        </>
-                      )}
-                    </button>
-                  )}
+                      <span className="font-medium capitalize">{service.name.replace(/_/g, ' ')}</span>
+                      <span className={service.status === 'up' ? 'text-green-300' : 'text-red-300'}>
+                        {service.status === 'up' ? 'Operational' : 'Unavailable'}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              </section>
+            )}
 
-        {/* Add More Integrations */}
-        <div className="mt-12 text-center">
-          <div className="bg-white/5 backdrop-blur-sm rounded-lg p-8 border border-white/10">
-            <h3 className="text-xl font-bold text-white mb-2">Need More Integrations?</h3>
-            <p className="text-white/70 mb-4">
-              We're always adding new integrations. Let us know what services you'd like to connect!
-            </p>
-            <button className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">
-              Request Integration
-            </button>
-          </div>
-        </div>
+            <section className="space-y-6">
+              {displays.map(({ definition, connection, status: statusEntry }) => {
+                const badge = getConnectionBadge(connection)
+                const isBusy = actionProvider === definition.provider
 
-        {/* Disconnect Confirmation Modal */}
-        {showDisconnectModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
-              <h2 className="text-xl font-bold text-white mb-4">Disconnect Integration?</h2>
-              <p className="text-white/70 mb-6">
-                This will remove the connection to{' '}
-                {integrations.find(i => i.id === showDisconnectModal)?.name}.
-                You can reconnect at any time.
-              </p>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setShowDisconnectModal(null)}
-                  className="flex-1 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleDisconnect(showDisconnectModal)}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  Disconnect
-                </button>
-              </div>
-            </div>
-          </div>
+                return (
+                  <div
+                    key={definition.provider}
+                    data-testid={`integration-card-${definition.provider}`}
+                    className="rounded-xl border border-white/10 bg-white/10 p-6 text-white shadow-sm backdrop-blur"
+                  >
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div className="flex flex-1 gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white/10 text-white">
+                          {PROVIDER_ICON_MAP[definition.provider] ?? <LinkIcon className="w-6 h-6" />}
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-2xl font-semibold">{definition.name}</h3>
+                            <span
+                              className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${badge.className}`}
+                            >
+                              {badge.text}
+                            </span>
+                            {statusEntry && (
+                              <span className={`text-xs font-medium ${getStatusColor(statusEntry)}`}>
+                                {statusEntry.status === 'available'
+                                  ? 'Service available'
+                                  : statusEntry.status === 'degraded'
+                                  ? 'Service degraded'
+                                  : 'Service unavailable'}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-white/70 max-w-2xl">{definition.description}</p>
+                          {definition.capabilities?.length > 0 && (
+                            <ul className="flex flex-wrap gap-2 text-sm text-white/80">
+                              {definition.capabilities.map(capability => (
+                                <li
+                                  key={capability}
+                                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1"
+                                >
+                                  {capability}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {connection?.last_error && (
+                            <div className="flex items-start gap-2 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm">
+                              <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 flex-none" />
+                              <div>
+                                <p className="font-medium">Connection issue</p>
+                                <p className="text-white/70">{connection.last_error}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-3">
+                        <div className="text-right text-sm text-white/70">
+                          {connection?.account_email && <p>{connection.account_email}</p>}
+                          {connection?.connected_at && (
+                            <p className="mt-1">
+                              Connected {new Date(connection.connected_at).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                        {connection ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDisconnect(definition.provider)}
+                            disabled={isBusy}
+                            className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            data-testid={`disconnect-${definition.provider}`}
+                          >
+                            {isBusy ? (
+                              <>
+                                <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                Disconnecting…
+                              </>
+                            ) : (
+                              <>
+                                <XMarkIcon className="h-4 w-4" />
+                                Disconnect
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleConnect(definition.provider)}
+                            disabled={isBusy}
+                            className="inline-flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
+                            data-testid={`connect-${definition.provider}`}
+                          >
+                            {isBusy ? (
+                              <>
+                                <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                Redirecting…
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircleIcon className="h-4 w-4" />
+                                Connect
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </section>
+          </>
         )}
       </div>
     </div>

@@ -304,14 +304,21 @@ export const API_ENDPOINTS = {
   // Integrations endpoints - Enhanced with multiple providers
   integrations: {
     googleDriveAuthUrl: '/api/integrations/google-drive/auth-url/',
+    googleDriveCallback: '/api/integrations/google-drive/oauth-callback/',
     googleDriveFiles: '/api/integrations/google-drive/files/',
     s3PresignedUpload: '/api/integrations/s3/presigned-upload/',
-    
+
     // Additional Integration Features
-    authUrl: (provider: string) => `/api/integrations/${provider}/auth-url/`,
-    callback: (provider: string) => `/api/integrations/${provider}/callback/`,
+    authUrl: (provider: string) => `/api/integrations/social/${provider}/auth-url/`,
+    callback: (provider: string) => `/api/integrations/social/${provider}/callback/`,
     health: '/api/integrations/health/',
-    gdriveStreamingUrl: (fileId: string) => `/api/integrations/files/${fileId}/streaming-url/`,
+    status: '/api/integrations/status/',
+    types: '/api/integrations/types/',
+    connections: '/api/integrations/connections/',
+    disconnectConnection: (connectionId: string) =>
+      `/api/integrations/connections/${connectionId}/disconnect/`,
+    gdriveStreamingUrl: (fileId: string) =>
+      `/api/integrations/google-drive/files/${fileId}/streaming-url/`,
   },
 
   // Interactive features endpoints - Complete implementation
@@ -396,6 +403,41 @@ export const API_ENDPOINTS = {
     activities: '/api/dashboard/activities/',
   },
 
+  // Documentation management endpoints
+  docs: {
+    list: '/api/docs/',
+    create: '/api/docs/',
+    detail: (docId: string) => `/api/docs/${docId}/`,
+    update: (docId: string) => `/api/docs/${docId}/`,
+    delete: (docId: string) => `/api/docs/${docId}/`,
+    publish: (docId: string) => `/api/docs/${docId}/publish/`,
+    archive: (docId: string) => `/api/docs/${docId}/archive/`,
+    versions: (docId: string) => `/api/docs/${docId}/versions/`,
+    categories: '/api/docs/categories/',
+    categoryDetail: (categoryId: string) => `/api/docs/categories/${categoryId}/`,
+    search: '/api/docs/search/',
+    bulkImport: '/api/docs/import/',
+    export: '/api/docs/export/',
+  },
+
+  // Localization and translation endpoints
+  localization: {
+    languages: '/api/localization/languages/',
+    languageDetail: (code: string) => `/api/localization/languages/${code}/`,
+    projects: '/api/localization/projects/',
+    projectDetail: (projectId: string) => `/api/localization/projects/${projectId}/`,
+    projectLanguages: (projectId: string) => `/api/localization/projects/${projectId}/languages/`,
+    strings: (projectId: string) => `/api/localization/projects/${projectId}/strings/`,
+    stringDetail: (projectId: string, stringId: string) =>
+      `/api/localization/projects/${projectId}/strings/${stringId}/`,
+    submitString: (projectId: string) => `/api/localization/projects/${projectId}/strings/submit/`,
+    approvals: (projectId: string) => `/api/localization/projects/${projectId}/approvals/`,
+    approvalDetail: (projectId: string, approvalId: string) =>
+      `/api/localization/projects/${projectId}/approvals/${approvalId}/`,
+    reviewers: (projectId: string) => `/api/localization/projects/${projectId}/reviewers/`,
+    glossary: '/api/localization/glossary/',
+  },
+
   // Events API - Event scheduling and management system
   events: {
     list: '/api/events/',
@@ -464,6 +506,8 @@ export const API_ENDPOINTS = {
   support: {
     faqCategories: '/api/support/faq/categories/',
     faq: '/api/support/faq/',
+    faqDetail: (faqId: string) => `/api/support/faq/${faqId}/`,
+    faqReorder: '/api/support/faq/reorder/',
     voteFaq: (faqId: string) => `/api/support/faq/${faqId}/vote/`,
     viewFaq: (faqId: string) => `/api/support/faq/${faqId}/view/`,
     tickets: '/api/support/tickets/',
