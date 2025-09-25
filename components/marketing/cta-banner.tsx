@@ -5,6 +5,7 @@ import { memo } from "react"
 import { Film, Play, Users, CheckCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 interface CtaBannerProps {
   isAuthenticated: boolean
@@ -37,7 +38,12 @@ function CtaBannerComponent({ isAuthenticated }: CtaBannerProps) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               {isAuthenticated ? (
                 <Link href="/dashboard/parties/create">
-                  <Button className="bg-white text-black hover:bg-white/90 text-lg px-8 py-4 rounded-lg font-semibold transition-all duration-300 group">
+                  <Button
+                    className={cn(
+                      "group rounded-lg px-8 py-4 text-lg font-semibold transition-all duration-300",
+                      "bg-white text-black hover:bg-white/90",
+                    )}
+                  >
                     <Play className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
                     Create Watch Party
                   </Button>
@@ -45,7 +51,12 @@ function CtaBannerComponent({ isAuthenticated }: CtaBannerProps) {
               ) : (
                 <>
                   <Link href="/register">
-                    <Button className="bg-white text-black hover:bg-white/90 text-lg px-8 py-4 rounded-lg font-semibold transition-all duration-300 group">
+                    <Button
+                      className={cn(
+                        "group rounded-lg px-8 py-4 text-lg font-semibold transition-all duration-300",
+                        "bg-white text-black hover:bg-white/90",
+                      )}
+                    >
                       <Users className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
                       Get Started Free
                     </Button>
@@ -53,7 +64,10 @@ function CtaBannerComponent({ isAuthenticated }: CtaBannerProps) {
                   <Link href="/about">
                     <Button
                       variant="outline"
-                      className="border-white/30 text-white hover:bg-white/10 text-lg px-8 py-4 rounded-lg backdrop-blur-sm transition-all duration-300 bg-transparent"
+                      className={cn(
+                        "rounded-lg px-8 py-4 text-lg transition-all duration-300 backdrop-blur-sm",
+                        "border-white/30 bg-transparent text-white hover:bg-white/10",
+                      )}
                     >
                       Learn More
                     </Button>

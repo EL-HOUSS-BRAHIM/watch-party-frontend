@@ -1,20 +1,20 @@
-'use client'
+"use client"
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Play } from 'lucide-react'
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Play } from "lucide-react"
 
-import { MobileNavigation } from '@/components/navigation/mobile-navigation'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
-import { useAuth } from '@/contexts/auth-context'
-import { isAuthRoute, isMarketingRoute } from '@/lib/navigation/visibility'
+import { MobileNavigation } from "@/components/navigation/mobile-navigation"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { useAuth } from "@/contexts/auth-context"
+import { isAuthRoute, isMarketingRoute } from "@/lib/navigation/visibility"
 
 export function CinemaHeader() {
   const pathname = usePathname()
   const { user } = useAuth()
 
-  if (isAuthRoute(pathname) || pathname?.startsWith('/admin')) {
+  if (isAuthRoute(pathname) || pathname?.startsWith("/admin")) {
     return null
   }
 
@@ -36,13 +36,13 @@ export function CinemaHeader() {
           <nav className="hidden md:flex items-center space-x-6">
             <Link
               href="/discover"
-              className={`text-sm font-medium transition-colors ${pathname === '/discover' ? 'text-white' : 'text-white/80 hover:text-white'}`}
+              className={`text-sm font-medium transition-colors ${pathname === "/discover" ? "text-white" : "text-white/80 hover:text-white"}`}
             >
               Discover
             </Link>
             <Link
               href="/about"
-              className={`text-sm font-medium transition-colors ${pathname === '/about' ? 'text-white' : 'text-white/80 hover:text-white'}`}
+              className={`text-sm font-medium transition-colors ${pathname === "/about" ? "text-white" : "text-white/80 hover:text-white"}`}
             >
               About
             </Link>
@@ -65,7 +65,7 @@ export function CinemaHeader() {
                 <Avatar className="w-8 h-8">
                   <AvatarImage src={user.avatar || undefined} />
                   <AvatarFallback className="bg-white/10 text-white text-sm">
-                    {user.first_name?.charAt(0)?.toUpperCase() || user.full_name?.charAt(0)?.toUpperCase() || 'U'}
+                    {user.first_name?.charAt(0)?.toUpperCase() || user.full_name?.charAt(0)?.toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
               </div>

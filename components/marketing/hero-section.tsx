@@ -2,19 +2,26 @@
 
 import Link from "next/link"
 import { useMemo } from "react"
-import { Play, ArrowRight, Users, Eye, Award } from "lucide-react"
+import { Play, ArrowRight, Users, Eye, Award, type LucideIcon } from "lucide-react"
 
 import type { MarketingStat } from "@/app/(marketing)/data/home-content"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 interface HeroSectionProps {
   isAuthenticated: boolean
   stats: MarketingStat[]
 }
 
+interface CtaConfig {
+  href: string
+  label: string
+  icon: LucideIcon
+}
+
 export function HeroSection({ isAuthenticated, stats }: HeroSectionProps) {
-  const primaryCta = useMemo(() => {
+  const primaryCta = useMemo<CtaConfig>(() => {
     if (isAuthenticated) {
       return {
         href: "/dashboard",
@@ -28,14 +35,7 @@ export function HeroSection({ isAuthenticated, stats }: HeroSectionProps) {
       label: "Start Watching Free",
       icon: Users,
     }
-  }, [isAuthenticated])
-
-  const secondaryCta = isAuthenticated
-    ? null
-    : {
-        href: "/discover",
-        label: "Browse Parties",
-      }
+  const PrimaryIcon = primaryCta.icon
 
   return (
     <section className="relative pt-20 pb-32">
@@ -62,8 +62,13 @@ export function HeroSection({ isAuthenticated, stats }: HeroSectionProps) {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link href={primaryCta.href}>
-              <Button className="bg-white text-black hover:bg-white/90 text-lg px-8 py-4 rounded-lg font-semibold transition-all duration-300 group">
-                <primaryCta.icon className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+              <Button
+                className={cn(
+                  "group rounded-lg px-8 py-4 text-lg font-semibold transition-all duration-300",
+                  "bg-white text-black hover:bg-white/90",
+                )}
+              >
+                <PrimaryIcon className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
                 {primaryCta.label}
                 <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
@@ -73,7 +78,10 @@ export function HeroSection({ isAuthenticated, stats }: HeroSectionProps) {
               <Link href={secondaryCta.href}>
                 <Button
                   variant="outline"
-                  className="border-white/30 text-white hover:bg-white/10 text-lg px-8 py-4 rounded-lg font-semibold backdrop-blur-sm transition-all duration-300 bg-transparent"
+                  className={cn(
+                    "rounded-lg px-8 py-4 text-lg font-semibold transition-all duration-300 backdrop-blur-sm",
+                    "border-white/30 bg-transparent text-white hover:bg-white/10",
+                  )}
                 >
                   <Eye className="w-5 h-5 mr-2" />
                   {secondaryCta.label}
@@ -83,15 +91,18 @@ export function HeroSection({ isAuthenticated, stats }: HeroSectionProps) {
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 pt-8">
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-                <div className="flex justify-center mb-2">
-                  <stat.icon className="w-6 h-6 text-white" />
+            {stats.map((stat) => {
+              const StatIcon = stat.icon
+              return (
+                <div key={stat.label} className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
+                  <div className="flex justify-center mb-2">
+                    <StatIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="text-2xl md:text-3xl font-bold text-white">{stat.number}</div>
+                  <div className="text-sm text-white/60">{stat.label}</div>
                 </div>
-                <div className="text-2xl md:text-3xl font-bold text-white">{stat.number}</div>
-                <div className="text-sm text-white/60">{stat.label}</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>

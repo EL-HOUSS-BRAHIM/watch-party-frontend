@@ -5,6 +5,7 @@ import { Award } from "lucide-react"
 
 import type { MarketingFeature } from "@/app/(marketing)/data/home-content"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 interface FeatureGridProps {
   features: MarketingFeature[]
@@ -34,18 +35,21 @@ function FeatureGridComponent({ features }: FeatureGridProps) {
             return (
               <div
                 key={feature.title}
-                className="group bg-white/5 backdrop-blur-sm rounded-lg p-8 border border-white/10 hover:border-white/20 transition-all duration-500 hover:scale-105"
+                className={cn(
+                  "group rounded-lg border border-white/10 bg-white/5 p-8 backdrop-blur-sm transition-all duration-500",
+                  "hover:scale-105 hover:border-white/20",
+                )}
               >
                 <div className="flex items-start space-x-4">
-                  <div className="p-4 rounded-lg bg-white/10 group-hover:bg-white/20 transition-all duration-300">
+                  <div className="rounded-lg bg-white/10 p-4 transition-all duration-300 group-hover:bg-white/20">
                     <Icon className="h-6 w-6 text-white" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-white/90 transition-colors">
+                    <h3 className="mb-2 text-xl font-semibold text-white transition-colors group-hover:text-white/90">
                       {feature.title}
                     </h3>
-                    <p className="text-white/60 leading-relaxed mb-3">{feature.description}</p>
-                    <div className="text-sm text-white/80 font-medium">{feature.stats}</div>
+                    <p className="mb-3 leading-relaxed text-white/60">{feature.description}</p>
+                    <div className="text-sm font-medium text-white/80">{feature.stats}</div>
                   </div>
                 </div>
               </div>

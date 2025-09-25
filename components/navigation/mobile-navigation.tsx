@@ -1,9 +1,9 @@
-'use client'
+"use client"
 
-import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useTheme } from 'next-themes'
+import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { useTheme } from "next-themes"
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -31,10 +31,10 @@ import {
   CreditCard,
   HelpCircle,
   Moon,
-  Sun
-} from 'lucide-react'
-import { useAuth } from '@/contexts/auth-context'
-import { useNotifications } from '@/hooks/use-api'
+  Sun,
+} from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import { useNotifications } from "@/hooks/use-api"
 
 interface NavigationItem {
   label: string
@@ -67,47 +67,48 @@ export function MobileNavigation() {
 
     return [
       {
-        title: 'Discover',
+        title: "Discover",
         items: [
-          { label: 'Home', href: '/', icon: Home },
-          { label: 'Watch', href: '/watch', icon: Play },
-          { label: 'Discover', href: '/discover', icon: Search },
-          { label: 'Trending', href: '/trending', icon: TrendingUp },
-        ]
+          { label: "Home", href: "/", icon: Home },
+          { label: "Watch", href: "/watch", icon: Play },
+          { label: "Discover", href: "/discover", icon: Search },
+          { label: "Trending", href: "/trending", icon: TrendingUp },
+        ],
       },
       {
-        title: 'Social',
+        title: "Social",
         items: [
-          { label: 'Friends', href: '/friends', icon: Users, requiresAuth: true },
-          { label: 'Messages', href: '/chat', icon: MessageCircle, requiresAuth: true },
-          { label: 'Groups', href: '/groups', icon: Users, requiresAuth: true },
-          { label: 'Events', href: '/events', icon: Calendar, requiresAuth: true },
-        ]
+          { label: "Friends", href: "/friends", icon: Users, requiresAuth: true },
+          { label: "Messages", href: "/chat", icon: MessageCircle, requiresAuth: true },
+          { label: "Groups", href: "/groups", icon: Users, requiresAuth: true },
+          { label: "Events", href: "/events", icon: Calendar, requiresAuth: true },
+        ],
       },
       {
-        title: 'Library',
+        title: "Library",
         items: [
-          { label: 'Watch History', href: '/profile/history', icon: History, requiresAuth: true },
-          { label: 'Favorites', href: '/profile/favorites', icon: Heart, requiresAuth: true },
-          { label: 'Achievements', href: '/profile/achievements', icon: Trophy, requiresAuth: true },
-        ]
+          { label: "Watch History", href: "/profile/history", icon: History, requiresAuth: true },
+          { label: "Favorites", href: "/profile/favorites", icon: Heart, requiresAuth: true },
+          { label: "Achievements", href: "/profile/achievements", icon: Trophy, requiresAuth: true },
+        ],
       },
       {
-        title: 'Account',
+        title: "Account",
         items: [
-          { label: 'Notifications', href: '/notifications', icon: Bell, badge: unreadBadge, requiresAuth: true },
-          { label: 'Billing', href: '/billing', icon: CreditCard, requiresAuth: true },
-          { label: 'Store', href: '/store', icon: Store, premium: Boolean(user?.isPremium) },
-          { label: 'Settings', href: '/settings', icon: Settings, requiresAuth: true },
-          { label: 'Help', href: '/help', icon: HelpCircle },
-        ]
-      }
+          { label: "Notifications", href: "/notifications", icon: Bell, badge: unreadBadge, requiresAuth: true },
+          { label: "Billing", href: "/billing", icon: CreditCard, requiresAuth: true },
+          { label: "Store", href: "/store", icon: Store, premium: Boolean(user?.isPremium) },
+          { label: "Settings", href: "/settings", icon: Settings, requiresAuth: true },
+          { label: "Help", href: "/help", icon: HelpCircle },
+        ],
+      },
     ]
   }, [unreadCount, user?.isPremium])
 
   const toggleTheme = () => {
-    const nextTheme = (theme === 'system' ? resolvedTheme : theme) === 'light' ? 'dark' : 'light'
-    setTheme(nextTheme)
+    const currentTheme = theme === "system" ? resolvedTheme : theme
+    const nextTheme = currentTheme === "light" ? "dark" : "light"
+    setTheme(nextTheme ?? "light")
   }
 
   const handleLogout = () => {
@@ -116,9 +117,12 @@ export function MobileNavigation() {
   }
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/'
-    return pathname.startsWith(href)
+    if (href === "/") return pathname === "/"
+    return pathname?.startsWith(href)
   }
+
+  const currentTheme = theme === "system" ? resolvedTheme : theme
+  const isLightMode = currentTheme === "light"
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -135,7 +139,7 @@ export function MobileNavigation() {
               <div className="p-6 border-b">
                 <div className="flex items-center space-x-3">
                   <Avatar className="h-12 w-12">
-                    <AvatarImage src={user.avatar || ''} />
+                    <AvatarImage src={user.avatar || undefined} />
                     <AvatarFallback>
                       {user.displayName?.charAt(0)?.toUpperCase() || <User className="h-6 w-6" />}
                     </AvatarFallback>
@@ -180,42 +184,34 @@ export function MobileNavigation() {
                   </div>
                   <div className="space-y-1 px-3">
                     {section.items.map((item) => {
-                      // Skip auth-required items if not logged in
                       if (item.requiresAuth && !isAuthenticated) return null
-                      
+
                       const Icon = item.icon
-                      const active = isActive(item.href)
-                      
+                      const active = Boolean(isActive(item.href))
+
                       return (
                         <SheetClose asChild key={item.href}>
                           <Link
                             href={item.href}
                             className={`
                               flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors
-                              ${active 
-                                ? 'bg-primary text-primary-foreground' 
-                                : 'hover:bg-accent hover:text-accent-foreground'
-                              }
+                              ${active ? "bg-primary text-primary-foreground" : "hover:bg-accent hover:text-accent-foreground"}
                             `}
                           >
                             <Icon className="h-4 w-4 flex-shrink-0" />
                             <span className="flex-1">{item.label}</span>
                             {item.badge && (
-                              <Badge variant={active ? 'secondary' : 'default'} className="text-xs">
+                              <Badge variant={active ? "secondary" : "default"} className="text-xs">
                                 {item.badge}
                               </Badge>
                             )}
-                            {item.premium && (
-                              <Crown className="h-3 w-3 text-yellow-500" />
-                            )}
+                            {item.premium && <Crown className="h-3 w-3 text-yellow-500" />}
                           </Link>
                         </SheetClose>
                       )
                     })}
                   </div>
-                  {sectionIndex < navigationSections.length - 1 && (
-                    <Separator className="my-4" />
-                  )}
+                  {sectionIndex < navigationSections.length - 1 && <Separator className="my-4" />}
                 </div>
               ))}
             </div>
@@ -229,7 +225,7 @@ export function MobileNavigation() {
                 className="w-full justify-start"
                 disabled={!mounted}
               >
-                {(theme === 'system' ? resolvedTheme : theme) === 'light' ? (
+                {isLightMode ? (
                   <>
                     <Moon className="h-4 w-4 mr-3" />
                     Dark Mode
@@ -242,15 +238,9 @@ export function MobileNavigation() {
                 )}
               </Button>
 
-              {/* Profile Link */}
               {user && (
                 <SheetClose asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    asChild
-                    className="w-full justify-start"
-                  >
+                  <Button variant="ghost" size="sm" asChild className="w-full justify-start">
                     <Link href={`/profile/${user.id}`}>
                       <User className="h-4 w-4 mr-3" />
                       My Profile
