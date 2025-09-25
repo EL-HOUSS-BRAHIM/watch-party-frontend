@@ -1,20 +1,15 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { 
-  Menu, 
-  Home, 
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { useEffect, useMemo, useState, type ComponentType } from "react"
+import { useTheme } from "next-themes"
+import {
+  Menu,
+  Home,
   Play,
-  Users, 
-  MessageCircle, 
+  Users,
+  MessageCircle,
   Search,
   Bell,
   Settings,
@@ -30,13 +25,22 @@ import {
   CreditCard,
   HelpCircle,
   Moon,
-  Sun
-} from 'lucide-react'
+  Sun,
+} from "lucide-react"
+
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Separator } from "@/components/ui/separator"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { useAuth } from "@/contexts/auth-context"
+import { useNotifications } from "@/hooks/use-api"
 
 interface NavigationItem {
   label: string
   href: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: ComponentType<{ className?: string }>
   badge?: number | string
   requiresAuth?: boolean
   premium?: boolean
@@ -49,107 +53,77 @@ interface NavigationSection {
 
 export function MobileNavigation() {
   const [isOpen, setIsOpen] = useState(false)
-  const [user, setUser] = useState<any>(null)
-  const [notifications, setNotifications] = useState(0)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
-
-  const navigationSections: NavigationSection[] = [
-    {
-      title: 'Discover',
-      items: [
-        { label: 'Home', href: '/', icon: Home },
-        { label: 'Watch', href: '/watch', icon: Play },
-        { label: 'Discover', href: '/discover', icon: Search },
-        { label: 'Trending', href: '/trending', icon: TrendingUp },
-      ]
-    },
-    {
-      title: 'Social',
-      items: [
-        { label: 'Friends', href: '/friends', icon: Users, requiresAuth: true },
-        { label: 'Messages', href: '/chat', icon: MessageCircle, badge: 3, requiresAuth: true },
-        { label: 'Groups', href: '/groups', icon: Users, requiresAuth: true },
-        { label: 'Events', href: '/events', icon: Calendar, requiresAuth: true },
-      ]
-    },
-    {
-      title: 'Library',
-      items: [
-        { label: 'Watch History', href: '/profile/history', icon: History, requiresAuth: true },
-        { label: 'Favorites', href: '/profile/favorites', icon: Heart, requiresAuth: true },
-        { label: 'Achievements', href: '/profile/achievements', icon: Trophy, requiresAuth: true },
-      ]
-    },
-    {
-      title: 'Account',
-      items: [
-        { label: 'Notifications', href: '/notifications', icon: Bell, badge: notifications, requiresAuth: true },
-        { label: 'Billing', href: '/billing', icon: CreditCard, requiresAuth: true },
-        { label: 'Store', href: '/store', icon: Store, premium: true },
-        { label: 'Settings', href: '/settings', icon: Settings, requiresAuth: true },
-        { label: 'Help', href: '/help', icon: HelpCircle },
-      ]
-    }
-  ]
+  const { user, isAuthenticated, logout } = useAuth()
+  const { unreadCount } = useNotifications()
+  const { resolvedTheme, setTheme, theme } = useTheme()
 
   useEffect(() => {
-    // Load user data and notifications
-    const loadUserData = async () => {
-      try {
-        const response = await fetch('/api/auth/user')
-        if (response.ok) {
-          const userData = await response.json()
-          setUser(userData)
-        }
-      } catch (error) {
-        console.error('Failed to load user data:', error)
-      }
-    }
-
-    const loadNotifications = async () => {
-      try {
-        const response = await fetch('/api/notifications/unread-count')
-        if (response.ok) {
-          const data = await response.json()
-          setNotifications(data.count)
-        }
-      } catch (error) {
-        console.error('Failed to load notifications:', error)
-      }
-    }
-
-    loadUserData()
-    if (user) loadNotifications()
-  }, [user])
-
-  useEffect(() => {
-    // Load theme preference
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' || 'light'
-    setTheme(savedTheme)
-    document.documentElement.classList.toggle('dark', savedTheme === 'dark')
+    setMounted(true)
   }, [])
 
+  const navigationSections = useMemo<NavigationSection[]>(() => {
+    const unreadBadge = unreadCount > 0 ? unreadCount : undefined
+
+    return [
+      {
+        title: "Discover",
+        items: [
+          { label: "Home", href: "/", icon: Home },
+          { label: "Watch", href: "/watch", icon: Play },
+          { label: "Discover", href: "/discover", icon: Search },
+          { label: "Trending", href: "/trending", icon: TrendingUp },
+        ],
+      },
+      {
+        title: "Social",
+        items: [
+          { label: "Friends", href: "/friends", icon: Users, requiresAuth: true },
+          { label: "Messages", href: "/chat", icon: MessageCircle, requiresAuth: true },
+          { label: "Groups", href: "/groups", icon: Users, requiresAuth: true },
+          { label: "Events", href: "/events", icon: Calendar, requiresAuth: true },
+        ],
+      },
+      {
+        title: "Library",
+        items: [
+          { label: "Watch History", href: "/profile/history", icon: History, requiresAuth: true },
+          { label: "Favorites", href: "/profile/favorites", icon: Heart, requiresAuth: true },
+          { label: "Achievements", href: "/profile/achievements", icon: Trophy, requiresAuth: true },
+        ],
+      },
+      {
+        title: "Account",
+        items: [
+          { label: "Notifications", href: "/notifications", icon: Bell, badge: unreadBadge, requiresAuth: true },
+          { label: "Billing", href: "/billing", icon: CreditCard, requiresAuth: true },
+          { label: "Store", href: "/store", icon: Store, premium: Boolean(user?.isPremium) },
+          { label: "Settings", href: "/settings", icon: Settings, requiresAuth: true },
+          { label: "Help", href: "/help", icon: HelpCircle },
+        ],
+      },
+    ]
+  }, [unreadCount, user?.isPremium])
+
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light'
-    setTheme(newTheme)
-    localStorage.setItem('theme', newTheme)
-    document.documentElement.classList.toggle('dark', newTheme === 'dark')
+    const currentTheme = theme === "system" ? resolvedTheme : theme
+    const nextTheme = currentTheme === "light" ? "dark" : "light"
+    setTheme(nextTheme ?? "light")
   }
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' })
-      window.location.href = '/auth/login'
-    } catch (error) {
-      console.error('Logout failed:', error)
-    }
+  const handleLogout = () => {
+    setIsOpen(false)
+    void logout()
   }
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/'
-    return pathname.startsWith(href)
+    if (href === "/") return pathname === "/"
+    return pathname?.startsWith(href)
   }
+
+  const currentTheme = theme === "system" ? resolvedTheme : theme
+  const isLightMode = currentTheme === "light"
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -161,12 +135,11 @@ export function MobileNavigation() {
       <SheetContent side="left" className="w-80 p-0">
         <ScrollArea className="h-full">
           <div className="flex flex-col h-full">
-            {/* User Profile Section */}
             {user ? (
               <div className="p-6 border-b">
                 <div className="flex items-center space-x-3">
                   <Avatar className="h-12 w-12">
-                    <AvatarImage src={user.avatar || ''} />
+                    <AvatarImage src={user.avatar || undefined} />
                     <AvatarFallback>
                       {user.displayName?.charAt(0)?.toUpperCase() || <User className="h-6 w-6" />}
                     </AvatarFallback>
@@ -200,7 +173,6 @@ export function MobileNavigation() {
               </div>
             )}
 
-            {/* Navigation Sections */}
             <div className="flex-1 py-2">
               {navigationSections.map((section, sectionIndex) => (
                 <div key={section.title}>
@@ -211,56 +183,47 @@ export function MobileNavigation() {
                   </div>
                   <div className="space-y-1 px-3">
                     {section.items.map((item) => {
-                      // Skip auth-required items if not logged in
-                      if (item.requiresAuth && !user) return null
-                      
+                      if (item.requiresAuth && !isAuthenticated) return null
+
                       const Icon = item.icon
-                      const active = isActive(item.href)
-                      
+                      const active = Boolean(isActive(item.href))
+
                       return (
                         <SheetClose asChild key={item.href}>
                           <Link
                             href={item.href}
                             className={`
                               flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors
-                              ${active 
-                                ? 'bg-primary text-primary-foreground' 
-                                : 'hover:bg-accent hover:text-accent-foreground'
-                              }
+                              ${active ? "bg-primary text-primary-foreground" : "hover:bg-accent hover:text-accent-foreground"}
                             `}
                           >
                             <Icon className="h-4 w-4 flex-shrink-0" />
                             <span className="flex-1">{item.label}</span>
                             {item.badge && (
-                              <Badge variant={active ? 'secondary' : 'default'} className="text-xs">
+                              <Badge variant={active ? "secondary" : "default"} className="text-xs">
                                 {item.badge}
                               </Badge>
                             )}
-                            {item.premium && (
-                              <Crown className="h-3 w-3 text-yellow-500" />
-                            )}
+                            {item.premium && <Crown className="h-3 w-3 text-yellow-500" />}
                           </Link>
                         </SheetClose>
                       )
                     })}
                   </div>
-                  {sectionIndex < navigationSections.length - 1 && (
-                    <Separator className="my-4" />
-                  )}
+                  {sectionIndex < navigationSections.length - 1 && <Separator className="my-4" />}
                 </div>
               ))}
             </div>
 
-            {/* Bottom Actions */}
             <div className="border-t p-3 space-y-1">
-              {/* Theme Toggle */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={toggleTheme}
                 className="w-full justify-start"
+                disabled={!mounted}
               >
-                {theme === 'light' ? (
+                {isLightMode ? (
                   <>
                     <Moon className="h-4 w-4 mr-3" />
                     Dark Mode
@@ -273,15 +236,9 @@ export function MobileNavigation() {
                 )}
               </Button>
 
-              {/* Profile Link */}
               {user && (
                 <SheetClose asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    asChild
-                    className="w-full justify-start"
-                  >
+                  <Button variant="ghost" size="sm" asChild className="w-full justify-start">
                     <Link href={`/profile/${user.id}`}>
                       <User className="h-4 w-4 mr-3" />
                       My Profile
@@ -290,7 +247,6 @@ export function MobileNavigation() {
                 </SheetClose>
               )}
 
-              {/* Logout */}
               {user && (
                 <Button
                   variant="ghost"
