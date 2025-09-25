@@ -78,8 +78,6 @@ const generateTimeSeriesData = () => {
   return data;
 };
 
-export default function RealTimeAnalytics() {
-
 const mockLiveUsers: LiveUser[] = Array.from({ length: 25 }, (_, i) => ({
   id: `user-${i}`,
   username: `User${i + 1}`,

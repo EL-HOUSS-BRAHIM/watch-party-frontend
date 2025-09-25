@@ -35,15 +35,6 @@ export function HeroSection({ isAuthenticated, stats }: HeroSectionProps) {
       label: "Start Watching Free",
       icon: Users,
     }
-  }, [isAuthenticated])
-
-  const secondaryCta = isAuthenticated
-    ? null
-    : {
-        href: "/discover",
-        label: "Browse Parties",
-      }
-
   const PrimaryIcon = primaryCta.icon
 
   return (
