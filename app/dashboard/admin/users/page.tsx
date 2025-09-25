@@ -227,9 +227,21 @@ export default function UserManagementPage() {
 
   const executeUserAction = async (action: UserAction, userIds: string[]) => {
     try {
+      if (action.type === 'verify') {
+        // Handle verify action separately since it's not supported by bulkUserAction
+        // You might want to implement a separate API call or update the user verification directly
+        console.log('Verify action not implemented in bulk API')
+        toast({
+          title: "Action Not Implemented",
+          description: "User verification is not yet implemented in bulk actions.",
+          variant: "destructive",
+        })
+        return
+      }
+      
       await adminAPI.bulkUserAction({
         user_ids: userIds,
-        action: action.type,
+        action: action.type as 'suspend' | 'unsuspend' | 'ban' | 'unban' | 'delete',
         reason: action.reason,
       })
 
@@ -744,7 +756,7 @@ export default function UserManagementPage() {
                           duration: actionDuration,
                           notifyUser,
                         },
-                        selectedUsers,
+                        selectedUsers.map(user => user.id),
                       )
                     }
                   }}
