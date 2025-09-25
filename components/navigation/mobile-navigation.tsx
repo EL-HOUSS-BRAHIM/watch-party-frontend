@@ -1,9 +1,15 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useMemo, useState, type ComponentType } from "react"
 import { useTheme } from "next-themes"
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Separator } from "@/components/ui/separator"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Menu,
   Home,
@@ -27,20 +33,13 @@ import {
   Moon,
   Sun,
 } from "lucide-react"
-
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAuth } from "@/contexts/auth-context"
 import { useNotifications } from "@/hooks/use-api"
 
 interface NavigationItem {
   label: string
   href: string
-  icon: ComponentType<{ className?: string }>
+  icon: React.ComponentType<{ className?: string }>
   badge?: number | string
   requiresAuth?: boolean
   premium?: boolean
@@ -135,6 +134,7 @@ export function MobileNavigation() {
       <SheetContent side="left" className="w-80 p-0">
         <ScrollArea className="h-full">
           <div className="flex flex-col h-full">
+            {/* User Profile Section */}
             {user ? (
               <div className="p-6 border-b">
                 <div className="flex items-center space-x-3">
@@ -173,6 +173,7 @@ export function MobileNavigation() {
               </div>
             )}
 
+            {/* Navigation Sections */}
             <div className="flex-1 py-2">
               {navigationSections.map((section, sectionIndex) => (
                 <div key={section.title}>
@@ -215,6 +216,7 @@ export function MobileNavigation() {
               ))}
             </div>
 
+            {/* Bottom Actions */}
             <div className="border-t p-3 space-y-1">
               <Button
                 variant="ghost"
@@ -247,6 +249,7 @@ export function MobileNavigation() {
                 </SheetClose>
               )}
 
+              {/* Logout */}
               {user && (
                 <Button
                   variant="ghost"

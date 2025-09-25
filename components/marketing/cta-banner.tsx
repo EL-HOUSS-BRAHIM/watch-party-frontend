@@ -36,7 +36,6 @@ function CtaBannerComponent({ isAuthenticated }: CtaBannerProps) {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              {isAuthenticated ? (
                 <Link href="/dashboard/parties/create">
                   <Button
                     className={cn(
@@ -49,7 +48,6 @@ function CtaBannerComponent({ isAuthenticated }: CtaBannerProps) {
                   </Button>
                 </Link>
               ) : (
-                <>
                   <Link href="/register">
                     <Button
                       className={cn(
@@ -61,13 +59,13 @@ function CtaBannerComponent({ isAuthenticated }: CtaBannerProps) {
                       Get Started Free
                     </Button>
                   </Link>
-                  <Link href="/about">
                     <Button
                       variant="outline"
                       className={cn(
                         "rounded-lg px-8 py-4 text-lg transition-all duration-300 backdrop-blur-sm",
                         "border-white/30 bg-transparent text-white hover:bg-white/10",
                       )}
+                    >
                     >
                       Learn More
                     </Button>

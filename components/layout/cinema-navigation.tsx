@@ -105,6 +105,7 @@ export function CinemaNavigation() {
   return (
     <nav className="fixed left-0 top-16 bottom-0 w-64 glass-sidebar border-r border-white/10 z-40 hidden lg:block">
       <div className="flex flex-col h-full">
+        {/* Quick Actions */}
         <div className="p-4 border-b border-white/10">
           <Button className="w-full btn-primary justify-start">
             <Users className="w-4 h-4 mr-2" />
@@ -112,6 +113,7 @@ export function CinemaNavigation() {
           </Button>
         </div>
 
+        {/* Navigation Items */}
         <div className="flex-1 overflow-y-auto py-4">
           <div className="space-y-1 px-2">
             {navigationItems.map((item) => (
@@ -129,6 +131,7 @@ export function CinemaNavigation() {
           </div>
         </div>
 
+        {/* Footer */}
         <div className="p-4 border-t border-white/10">
           <div className="text-xs text-gray-500 space-y-1">
             <div>WatchParty Cinema v2.0</div>

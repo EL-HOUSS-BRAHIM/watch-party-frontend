@@ -35,15 +35,6 @@ export function HeroSection({ isAuthenticated, stats }: HeroSectionProps) {
       label: "Start Watching Free",
       icon: Users,
     }
-  }, [isAuthenticated])
-
-  const secondaryCta = isAuthenticated
-    ? null
-    : {
-        href: "/discover",
-        label: "Browse Parties",
-      }
-
   const PrimaryIcon = primaryCta.icon
 
   return (
@@ -69,7 +60,6 @@ export function HeroSection({ isAuthenticated, stats }: HeroSectionProps) {
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link href={primaryCta.href}>
               <Button
                 className={cn(
@@ -84,13 +74,13 @@ export function HeroSection({ isAuthenticated, stats }: HeroSectionProps) {
             </Link>
 
             {secondaryCta && (
-              <Link href={secondaryCta.href}>
                 <Button
                   variant="outline"
                   className={cn(
                     "rounded-lg px-8 py-4 text-lg font-semibold transition-all duration-300 backdrop-blur-sm",
                     "border-white/30 bg-transparent text-white hover:bg-white/10",
                   )}
+                >
                 >
                   <Eye className="w-5 h-5 mr-2" />
                   {secondaryCta.label}
@@ -99,7 +89,6 @@ export function HeroSection({ isAuthenticated, stats }: HeroSectionProps) {
             )}
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 pt-8">
             {stats.map((stat) => {
               const StatIcon = stat.icon
               return (
