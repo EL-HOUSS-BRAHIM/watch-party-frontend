@@ -188,9 +188,9 @@ export default function FriendRequests({ className }: FriendRequestsProps) {
                   </h3>
                   <p className="text-sm text-gray-600">@{otherUser.username}</p>
 
-                  {isReceived && otherUser.mutualFriends > 0 && (
+                  {isReceived && (otherUser as any).mutualFriends > 0 && (
                     <p className="text-sm text-gray-500 mt-1">
-                      {otherUser.mutualFriends} mutual friend{otherUser.mutualFriends !== 1 ? "s" : ""}
+                      {(otherUser as any).mutualFriends} mutual friend{(otherUser as any).mutualFriends !== 1 ? "s" : ""}
                     </p>
                   )}
 
