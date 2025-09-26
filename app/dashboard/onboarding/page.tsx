@@ -49,10 +49,10 @@ const interestsSchema = z.object({
 })
 
 const socialSchema = z.object({
-  allowFriendRequests: z.boolean().default(true),
-  allowPartyInvites: z.boolean().default(true),
-  shareWatchHistory: z.boolean().default(false),
-  findByEmail: z.boolean().default(true),
+  allowFriendRequests: z.boolean().optional().default(true),
+  allowPartyInvites: z.boolean().optional().default(true),
+  shareWatchHistory: z.boolean().optional().default(false),
+  findByEmail: z.boolean().optional().default(true),
 })
 
 type ProfileFormData = z.infer<typeof profileSchema>
@@ -137,8 +137,8 @@ export default function OnboardingPage() {
     }
   })
 
-  const socialForm = useForm<SocialFormData>({
-    resolver: zodResolver(socialSchema),
+  const socialForm = useForm({
+    resolver: zodResolver(socialSchema) as any,
     defaultValues: {
       allowFriendRequests: true,
       allowPartyInvites: true,
@@ -528,7 +528,7 @@ export default function OnboardingPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={socialForm.handleSubmit(onSocialSubmit)} className="space-y-6">
+              <form onSubmit={socialForm.handleSubmit(onSocialSubmit as any)} className="space-y-6">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>

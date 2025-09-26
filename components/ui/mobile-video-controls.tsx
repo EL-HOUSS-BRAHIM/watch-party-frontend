@@ -43,13 +43,19 @@ export function MobileVideoControls({
 
   useEffect(() => {
     if (showControls) {
-      clearTimeout(timeoutRef.current)
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
       timeoutRef.current = setTimeout(() => {
         setShowControls(false)
       }, 3000)
     }
 
-    return () => clearTimeout(timeoutRef.current)
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
   }, [showControls])
 
   const handleTouchStart = () => {

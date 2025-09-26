@@ -110,7 +110,7 @@ const feedbackSchema = z.object({
   description: z.string().min(20, "Description must be at least 20 characters").max(2000, "Description too long"),
   category: z.enum(["bug", "feature", "improvement", "question", "complaint", "compliment", "other"]),
   priority: z.enum(["low", "medium", "high", "urgent"]),
-  is_public: z.boolean().default(true),
+  is_public: z.boolean().optional().default(true),
   tags: z.string().optional(),
 })
 
@@ -149,13 +149,13 @@ export default function FeedbackPage() {
     showMyFeedback: false
   })
 
-  const submitForm = useForm<z.infer<typeof feedbackSchema>>({
-    resolver: zodResolver(feedbackSchema),
+  const submitForm = useForm({
+    resolver: zodResolver(feedbackSchema) as any,
     defaultValues: {
       title: "",
       description: "",
-      category: "bug",
-      priority: "medium",
+      category: "bug" as const,
+      priority: "medium" as const,
       is_public: true,
       tags: "",
     },
@@ -724,7 +724,7 @@ export default function FeedbackPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={submitForm.handleSubmit(submitFeedback)} className="space-y-6">
+                <form onSubmit={submitForm.handleSubmit(submitFeedback as any)} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block">Category *</label>

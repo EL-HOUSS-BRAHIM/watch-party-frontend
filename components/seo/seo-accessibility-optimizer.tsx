@@ -73,11 +73,18 @@ interface SEOPage {
 
 const mockSEOMetrics: SEOMetric[] = []
 
+interface SEOTrend {
+  date: string;
+  seoScore: number;
+  accessibilityScore: number;
+  performanceScore: number;
+}
+
 const mockAccessibilityIssues: AccessibilityIssue[] = []
 
 const mockSEOPages: SEOPage[] = []
 
-const seoTrends = []
+const seoTrends: SEOTrend[] = []
 
 export function SEOAccessibilityOptimizer() {
   const { toast } = useToast()
