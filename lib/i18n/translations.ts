@@ -61,6 +61,15 @@ export const translations = {
         hours: "Hours Watched",
       },
     },
+    language: {
+      title: "Language Settings",
+      available: "Available Languages",
+      current: "Current Language",
+      change: "Change Language",
+      rtl_notice: "This language uses right-to-left text direction",
+      help: "Need help with translations?",
+      contribute: "Contribute translations",
+    },
   },
   es: {
     common: {
@@ -124,6 +133,15 @@ export const translations = {
         hours: "Horas Vistas",
       },
     },
+    language: {
+      title: "Configuración de Idioma",
+      available: "Idiomas Disponibles",
+      current: "Idioma Actual",
+      change: "Cambiar Idioma",
+      rtl_notice: "Este idioma usa dirección de texto de derecha a izquierda",
+      help: "¿Necesitas ayuda con las traducciones?",
+      contribute: "Contribuir traducciones",
+    },
   },
   fr: {
     common: {
@@ -186,6 +204,15 @@ export const translations = {
         videos: "Vidéos Regardées",
         hours: "Heures Regardées",
       },
+    },
+    language: {
+      title: "Paramètres de Langue",
+      available: "Langues Disponibles",
+      current: "Langue Actuelle",
+      change: "Changer de Langue",
+      rtl_notice: "Cette langue utilise la direction de texte de droite à gauche",
+      help: "Besoin d'aide avec les traductions ?",
+      contribute: "Contribuer aux traductions",
     },
   },
 }
