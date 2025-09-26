@@ -53,7 +53,7 @@ export class MessagingAPI {
     before?: string
   }): Promise<PaginatedResponse<Message>> {
     const response = await apiClient.get<PaginatedResponse<RawMessage>>(
-      API_ENDPOINTS.messaging.messages(conversationId),
+      API_ENDPOINTS.messaging.messages(Number(conversationId)),
       { params },
     )
     return transformPaginatedResponse(response, transformMessage)
@@ -68,7 +68,7 @@ export class MessagingAPI {
     message_type?: 'text' | 'image' | 'file'
   }): Promise<Message> {
     const response = await apiClient.post<RawMessage>(
-      API_ENDPOINTS.messaging.messages(conversationId),
+      API_ENDPOINTS.messaging.messages(Number(conversationId)),
       data,
     )
     return transformMessage(response)

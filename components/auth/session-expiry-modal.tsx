@@ -24,7 +24,7 @@ export function SessionExpiryModal({ isOpen, onClose, expiresAt }: SessionExpiry
   const [timeRemaining, setTimeRemaining] = useState(0)
   const [isExtending, setIsExtending] = useState(false)
   const router = useRouter()
-  const { logout, refreshToken } = useAuth()
+  const { logout, refreshTokens } = useAuth()
 
   useEffect(() => {
     if (!isOpen) return
@@ -55,7 +55,7 @@ export function SessionExpiryModal({ isOpen, onClose, expiresAt }: SessionExpiry
   const handleExtendSession = async () => {
     setIsExtending(true)
     try {
-      await refreshToken()
+      await refreshTokens()
       onClose()
     } catch (error) {
       await handleExpiry()
