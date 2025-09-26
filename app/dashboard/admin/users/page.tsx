@@ -119,7 +119,7 @@ export default function UserManagementPage() {
     try {
       const data = await adminAPI.getUsers({
         search: searchQuery || undefined,
-        status: statusFilter !== "all" ? (statusFilter as "active" | "inactive" | "banned") : undefined,
+        status: statusFilter !== "all" ? (statusFilter as "active" | "suspended" | "banned") : undefined,
         page: 1, // You can add pagination later
       })
       
