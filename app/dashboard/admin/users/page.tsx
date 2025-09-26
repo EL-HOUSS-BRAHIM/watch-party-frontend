@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -95,7 +95,7 @@ export default function UserManagementPage() {
   const [actionDuration, setActionDuration] = useState(7)
   const [notifyUser, setNotifyUser] = useState(true)
 
-  const [stats, setStats] = useState({
+  const [stats] = useState({
     total: 0,
     active: 0,
     banned: 0,
@@ -112,22 +112,14 @@ export default function UserManagementPage() {
     }
   }, [user, router])
 
-  useEffect(() => {
-    loadUsers()
-  }, [])
-
-  useEffect(() => {
-    filterUsers()
-  }, [users, searchQuery, statusFilter, roleFilter, subscriptionFilter])
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     if (!user?.is_staff && !user?.is_superuser) return
 
     setIsLoading(true)
     try {
       const data = await adminAPI.getUsers({
         search: searchQuery || undefined,
-        status: statusFilter !== "all" ? statusFilter as any : undefined,
+        status: statusFilter !== "all" ? (statusFilter as "active" | "inactive" | "banned") : undefined,
         page: 1, // You can add pagination later
       })
       
@@ -175,9 +167,9 @@ export default function UserManagementPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [user?.is_staff, user?.is_superuser, searchQuery, statusFilter, toast])
 
-  const filterUsers = () => {
+  const filterUsers = useCallback(() => {
     let filtered = [...users]
 
     // Search filter
@@ -231,7 +223,15 @@ export default function UserManagementPage() {
     }
 
     setFilteredUsers(filtered)
-  }
+  }, [users, searchQuery, statusFilter, roleFilter, subscriptionFilter])
+
+  useEffect(() => {
+    loadUsers()
+  }, [loadUsers])
+
+  useEffect(() => {
+    filterUsers()
+  }, [filterUsers])
 
   const executeUserAction = async (action: UserAction, userIds: string[]) => {
     try {
@@ -489,7 +489,7 @@ export default function UserManagementPage() {
         <div className="max-w-2xl mx-auto text-center">
           <Shield className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
-          <p className="text-muted-foreground mb-4">You don't have permission to access user management.</p>
+          <p className="text-muted-foreground mb-4">You don&apos;t have permission to access user management.</p>
           <Button onClick={() => router.push("/dashboard")}>Back to Dashboard</Button>
         </div>
       </div>

@@ -31,9 +31,6 @@ import {
   UserX,
   PlayCircle,
   Loader2,
-  ArrowUp,
-  ArrowDown,
-  Minus,
 } from "lucide-react"
 import { format } from "date-fns"
 
@@ -110,9 +107,9 @@ export default function AdminDashboardPage() {
     system: { uptime: 0, cpu: 0, memory: 0, storage: 0, bandwidth: 0 },
   })
 
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
+  const [recentActivity] = useState<RecentActivity[]>([])
   const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([])
-  const [performanceData, setPerformanceData] = useState<PerformanceMetric[]>([])
+  const [performanceData] = useState<PerformanceMetric[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
@@ -123,14 +120,6 @@ export default function AdminDashboardPage() {
       return
     }
   }, [user, router])
-
-  useEffect(() => {
-    loadDashboardData()
-
-    // Set up auto-refresh every 30 seconds
-    const interval = setInterval(loadDashboardData, 30000)
-    return () => clearInterval(interval)
-  }, [])
 
   const loadDashboardData = async () => {
     if (!user?.is_staff && !user?.is_superuser) return
@@ -150,7 +139,7 @@ export default function AdminDashboardPage() {
       setStats(transformedStats)
 
       // Load system health
-      const healthData = await adminAPI.getSystemHealth()
+      await adminAPI.getSystemHealth()
       // Update stats with health data if needed
 
       setLastUpdated(new Date())
@@ -165,6 +154,14 @@ export default function AdminDashboardPage() {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadDashboardData()
+
+    // Set up auto-refresh every 30 seconds
+    const interval = setInterval(loadDashboardData, 30000)
+    return () => clearInterval(interval)
+  }, [loadDashboardData])
 
   const resolveAlert = async (alertId: string) => {
     try {
@@ -293,14 +290,7 @@ export default function AdminDashboardPage() {
     return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + " " + sizes[i]
   }
 
-  const getChangeIndicator = (current: number, previous: number) => {
-    if (current > previous) {
-      return <ArrowUp className="h-3 w-3 text-green-500" />
-    } else if (current < previous) {
-      return <ArrowDown className="h-3 w-3 text-red-500" />
-    }
-    return <Minus className="h-3 w-3 text-gray-500" />
-  }
+
 
   if (!user?.is_staff && !user?.is_superuser) {
     return (
