@@ -45,7 +45,7 @@ export function UserFavorites({ userId }: UserFavoritesProps) {
     try {
       setIsLoading(true)
       const response = await api.get(`/users/${userId}/favorites/`)
-      setFavorites(response.data.favorites || [])
+      setFavorites((response.data as any).favorites || [])
     } catch (err) {
       console.error("Failed to load favorites:", err)
     } finally {

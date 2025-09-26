@@ -270,7 +270,7 @@ export default function VideosPage() {
   const loadVideos = async () => {
     try {
       setLoading(true)
-      const response = await videosAPI.getUserVideos()
+      const response = await videosAPI.getVideos()
       setVideos(response.videos)
     } catch (error) {
       console.error("Failed to load videos:", error)
