@@ -81,7 +81,7 @@ function VideoCard({ video }: { video: APIVideo }) {
           className="w-full h-48 object-cover rounded-t-lg"
         />
         <div className="absolute bottom-2 right-2 bg-black/80 text-white px-2 py-1 rounded text-xs">
-          {formatDuration(video.duration)}
+          {formatDuration(video.duration || 0)}
         </div>
         {video.status === "processing" && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-t-lg">
@@ -143,12 +143,12 @@ function VideoCard({ video }: { video: APIVideo }) {
           </div>
           <div className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
-            {formatDate(video.uploadedAt)}
+            {formatDate(video.uploadedAt || video.createdAt || new Date().toISOString())}
           </div>
         </div>
         <div className="flex items-center justify-between mt-2 pt-2 border-t text-xs text-muted-foreground">
           <span>
-            {formatFileSize(video.size)} • {video.format}
+            {formatFileSize(video.size || 0)} • {video.format || "Unknown"}
           </span>
           {video.status === "ready" && (
             <WatchPartyButton size="sm" variant="outline">
@@ -174,7 +174,7 @@ function VideoListItem({ video }: { video: APIVideo }) {
               className="w-24 h-16 object-cover rounded"
             />
             <div className="absolute bottom-1 right-1 bg-black/80 text-white px-1 py-0.5 rounded text-xs">
-              {formatDuration(video.duration)}
+              {formatDuration(video.duration || 0)}
             </div>
             {video.status === "processing" && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded">
@@ -215,8 +215,8 @@ function VideoListItem({ video }: { video: APIVideo }) {
                   <MessageCircle className="h-3 w-3" />
                   {video.comments}
                 </span>
-                <span>{formatFileSize(video.size)}</span>
-                <span>{formatDate(video.uploadedAt)}</span>
+                <span>{formatFileSize(video.size || 0)}</span>
+                <span>{formatDate(video.uploadedAt || video.createdAt || new Date().toISOString())}</span>
               </div>
               <div className="flex items-center gap-2">
                 {video.status === "ready" && (
@@ -271,7 +271,7 @@ export default function VideosPage() {
     try {
       setLoading(true)
       const response = await videosAPI.getVideos()
-      setVideos(response.videos)
+      setVideos(response.results || [])
     } catch (error) {
       console.error("Failed to load videos:", error)
     } finally {
@@ -306,9 +306,9 @@ export default function VideosPage() {
     filtered.sort((a, b) => {
       switch (sortBy) {
         case "newest":
-          return new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+          return new Date(b.uploadedAt || b.createdAt || 0).getTime() - new Date(a.uploadedAt || a.createdAt || 0).getTime()
         case "oldest":
-          return new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime()
+          return new Date(a.uploadedAt || a.createdAt || 0).getTime() - new Date(b.uploadedAt || b.createdAt || 0).getTime()
         case "most-viewed":
           return b.views - a.views
         case "most-liked":
@@ -371,7 +371,7 @@ export default function VideosPage() {
           <WatchPartyInput
             placeholder="Search videos..."
             value={searchQuery}
-            onChange={(value) => setSearchQuery(value)}
+            onChange={(e) => setSearchQuery(e.target.value)}
             icon={<Search className="h-4 w-4" />}
           />
         </div>
