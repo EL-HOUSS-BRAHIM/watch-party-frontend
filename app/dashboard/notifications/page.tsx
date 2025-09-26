@@ -125,7 +125,7 @@ export default function NotificationsPage() {
     setIsLoading(true)
     try {
       const data = await notificationsAPI.getNotifications()
-      setNotifications(data.results || [])
+      setNotifications((data.results || []) as Notification[])
       setStats(prev => ({
         ...prev,
         unread: data.unread_count || 0

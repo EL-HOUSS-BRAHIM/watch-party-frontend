@@ -53,7 +53,7 @@ export function StreamAnalyticsOverlay({ videoId, isLive = false, onClose }: Str
       setIsLoading(true)
       
       // Fetch video analytics from the API
-      const response = await videosAPI.getVideoAnalytics(videoId)
+      const response = await videosAPI.getAnalytics(videoId)
       
       if (response) {
         const normalizedData: StreamAnalyticsData = {

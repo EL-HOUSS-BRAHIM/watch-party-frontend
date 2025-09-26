@@ -77,7 +77,7 @@ export function VideoUpload() {
         headers: {
           'Content-Type': 'multipart/form-data'
         },
-        onUploadProgress: (progressEvent) => {
+        onUploadProgress: (progressEvent: any) => {
           if (progressEvent.total) {
             const loaded = progressEvent.loaded
             const total = progressEvent.total

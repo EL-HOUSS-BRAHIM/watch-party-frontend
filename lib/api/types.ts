@@ -639,6 +639,7 @@ export interface Message {
 export interface FAQCategory {
   id: string
   name: string
+  slug?: string
   description: string
   faq_count: number
 }
