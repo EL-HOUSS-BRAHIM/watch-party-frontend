@@ -117,9 +117,11 @@ function ResetPasswordForm() {
       } else {
         setErrors({ submit: response?.message || "Failed to reset password" })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Reset password error:", error)
-      const message = error?.response?.data?.message || error?.message || "An unexpected error occurred. Please try again."
+      const message = (error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message 
+        || (error as { message?: string })?.message 
+        || "An unexpected error occurred. Please try again."
       setErrors({ submit: message })
     } finally {
       setIsLoading(false)

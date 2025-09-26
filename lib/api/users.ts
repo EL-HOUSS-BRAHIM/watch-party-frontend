@@ -5,7 +5,7 @@
 
 import { apiClient } from "./client"
 import { API_ENDPOINTS } from "./endpoints"
-import { transformPaginatedResponse, transformUser } from "./transformers"
+import { transformUser } from "./transformers"
 import type {
   DashboardStats,
   User,
@@ -111,8 +111,8 @@ export class UsersAPI {
   /**
    * Get user inventory
    */
-  async getInventory(): Promise<any[]> {
-    return apiClient.get<any[]>(API_ENDPOINTS.users.inventory)
+  async getInventory(): Promise<Record<string, unknown>[]> {
+    return apiClient.get<Record<string, unknown>[]>(API_ENDPOINTS.users.inventory)
   }
 
   // === SESSION MANAGEMENT ===
@@ -413,7 +413,7 @@ export class UsersAPI {
   /**
    * Update notification settings
    */
-  async updateNotificationSettings(data: any): Promise<any> {
+  async updateNotificationSettings(data: Record<string, unknown>): Promise<Record<string, unknown>> {
     return apiClient.put(API_ENDPOINTS.users.notificationSettings, data)
   }
 
@@ -427,7 +427,7 @@ export class UsersAPI {
   /**
    * Update privacy settings
    */
-  async updatePrivacySettings(data: any): Promise<any> {
+  async updatePrivacySettings(data: Record<string, unknown>): Promise<Record<string, unknown>> {
     return apiClient.put(API_ENDPOINTS.users.privacySettings, data)
   }
 

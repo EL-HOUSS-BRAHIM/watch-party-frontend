@@ -37,11 +37,11 @@ export default function ForgotPasswordPage() {
         title: "Reset link sent!",
         description: "Please check your email for the password reset link.",
       })
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || 
-                          err?.response?.data?.detail || 
-                          err?.message || 
-                          "Something went wrong. Please try again."
+    } catch (err: unknown) {
+      const errorMessage = (err as { response?: { data?: { message?: string; detail?: string } }; message?: string })?.response?.data?.message 
+                          || (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail 
+                          || (err as { message?: string })?.message 
+                          || "Something went wrong. Please try again."
       setError(errorMessage)
       toast({
         title: "Error",
@@ -64,14 +64,14 @@ export default function ForgotPasswordPage() {
             <div>
               <WatchPartyCardTitle className="text-2xl">Check your email</WatchPartyCardTitle>
               <WatchPartyCardDescription className="mt-2">
-                We've sent a password reset link to <strong>{email}</strong>
+                We&apos;ve sent a password reset link to <strong>{email}</strong>
               </WatchPartyCardDescription>
             </div>
           </WatchPartyCardHeader>
 
           <WatchPartyCardContent className="space-y-4">
             <div className="text-center text-sm text-muted-foreground space-y-2">
-              <p>Didn't receive the email? Check your spam folder or</p>
+              <p>Didn&apos;t receive the email? Check your spam folder or</p>
               <WatchPartyButton
                 variant="ghost"
                 size="sm"
@@ -105,7 +105,7 @@ export default function ForgotPasswordPage() {
           </div>
           <WatchPartyCardTitle className="text-2xl">Forgot your password?</WatchPartyCardTitle>
           <WatchPartyCardDescription>
-            Enter your email address and we'll send you a link to reset your password.
+            Enter your email address and we&apos;ll send you a link to reset your password.
           </WatchPartyCardDescription>
         </WatchPartyCardHeader>
 

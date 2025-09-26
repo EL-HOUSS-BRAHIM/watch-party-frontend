@@ -5,15 +5,11 @@ import {
   ChartBarIcon,
   UsersIcon,
   PlayIcon,
-  EyeIcon,
-  ClockIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   DevicePhoneMobileIcon,
   ComputerDesktopIcon,
   GlobeAltIcon,
-  CalendarIcon,
-  FunnelIcon,
 } from '@heroicons/react/24/outline'
 import { analyticsAPI } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'

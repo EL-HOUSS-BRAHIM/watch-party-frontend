@@ -58,8 +58,8 @@ export class PerformanceMonitor {
     // First Input Delay
     new PerformanceObserver((list) => {
       const entries = list.getEntries()
-      entries.forEach((entry: any) => {
-        console.log("FID:", entry.processingStart - entry.startTime)
+      entries.forEach((entry: PerformanceEntry & { processingStart?: number; startTime: number }) => {
+        console.log("FID:", (entry.processingStart || 0) - entry.startTime)
       })
     }).observe({ entryTypes: ["first-input"] })
 
@@ -67,9 +67,9 @@ export class PerformanceMonitor {
     new PerformanceObserver((list) => {
       let clsValue = 0
       const entries = list.getEntries()
-      entries.forEach((entry: any) => {
+      entries.forEach((entry: PerformanceEntry & { hadRecentInput?: boolean; value?: number }) => {
         if (!entry.hadRecentInput) {
-          clsValue += entry.value
+          clsValue += entry.value || 0
         }
       })
       console.log("CLS:", clsValue)

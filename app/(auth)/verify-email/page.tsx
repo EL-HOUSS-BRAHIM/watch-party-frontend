@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, Suspense, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -23,6 +23,51 @@ function EmailVerificationHandler() {
   const token = searchParams.get("token")
   const email = searchParams.get("email")
 
+  const verifyEmail = useCallback(async () => {
+    setStatus("loading")
+
+    try {
+      const response = await fetch("/api/auth/verify-email/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token,
+          email,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setStatus("success")
+        setMessage("Email verified successfully! You can now log in.")
+
+        toast({
+          title: "Email Verified",
+          description: "Your email has been verified successfully.",
+        })
+
+        setTimeout(() => {
+          router.push("/login?verified=true")
+        }, 2000)
+      } else {
+        if (data.error === "token_expired") {
+          setStatus("expired")
+          setMessage("This verification link has expired. Please request a new one.")
+        } else {
+          setStatus("error")
+          setMessage(data.message || "Email verification failed. Please try again.")
+        }
+      }
+    } catch (error) {
+      console.error("Email verification error:", error)
+      setStatus("error")
+      setMessage("An unexpected error occurred. Please try again.")
+    }
+  }, [token, email, toast, router])
+
   useEffect(() => {
     if (!token || !email) {
       setStatus("error")
@@ -31,7 +76,7 @@ function EmailVerificationHandler() {
     }
 
     verifyEmail()
-  }, [token, email])
+  }, [])
 
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -44,10 +89,7 @@ function EmailVerificationHandler() {
     }
   }, [resendCooldown])
 
-  const verifyEmail = async () => {
-    setStatus("loading")
-
-    try {
+  const resendVerificationEmail = async () => {
       const response = await fetch("/api/auth/verify-email/", {
         method: "POST",
         headers: {

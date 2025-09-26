@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, Suspense, useMemo } from "react"
+import { useEffect, useState, Suspense, useMemo, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -27,11 +27,7 @@ function CallbackHandler() {
   const error = searchParams.get("error")
   const provider = searchParams.get("provider") || "google"
 
-  useEffect(() => {
-    handleCallback()
-  }, [code, state, error])
-
-  const handleCallback = async () => {
+  const handleCallback = useCallback(async () => {
     setStatus("loading")
 
     // Handle OAuth errors
@@ -71,7 +67,7 @@ function CallbackHandler() {
         })
       }
 
-      const extra = data as any
+      const extra = data as { requires_2fa?: boolean; email?: string; temp_token?: string }
       if (extra?.requires_2fa) {
         router.push(`/2fa/verify?email=${encodeURIComponent(extra.email ?? "")}&temp_token=${extra.temp_token ?? ""}`)
         return
@@ -92,13 +88,18 @@ function CallbackHandler() {
         sessionStorage.removeItem("auth_redirect")
         router.push(redirectTo)
       }, 2000)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Callback error:", error)
       setStatus("error")
-      const message = error?.response?.data?.message || (error instanceof Error ? error.message : undefined)
+      const message = (error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message 
+        || (error instanceof Error ? error.message : undefined)
       setMessage(message || "An unexpected error occurred during authentication.")
     }
-  }
+  }, [code, state, error, provider, authService, refreshUser, router, toast])
+
+  useEffect(() => {
+    handleCallback()
+  }, [handleCallback])
 
   const retryAuthentication = async () => {
     setIsRetrying(true)
@@ -236,7 +237,7 @@ function CallbackHandler() {
           <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
             <h4 className="text-white font-medium mb-2 flex items-center justify-center">
               <Play className="w-4 h-4 mr-2" />
-              What's Next?
+              What&apos;s Next?
             </h4>
             <ul className="space-y-1 text-sm text-gray-400">
               <li>• Access your personalized dashboard</li>

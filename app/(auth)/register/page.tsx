@@ -3,7 +3,6 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -29,7 +28,6 @@ import {
 } from "lucide-react"
 
 export default function RegisterPage() {
-  const router = useRouter()
   const { register, socialLogin, isLoading } = useAuth()
   const { toast } = useToast()
 
@@ -122,8 +120,8 @@ export default function RegisterPage() {
         description: "Welcome to WatchParty! Your account has been created successfully.",
         duration: 5000,
       })
-    } catch (error: any) {
-      const errorMessage = error?.message || "Registration failed. Please try again."
+    } catch (error: unknown) {
+      const errorMessage = (error as { message?: string })?.message || "Registration failed. Please try again."
       setErrors({ general: errorMessage })
       toast({
         title: "Registration Failed",
@@ -138,10 +136,10 @@ export default function RegisterPage() {
   const handleSocialLogin = async (provider: "google" | "github") => {
     try {
       await socialLogin(provider)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Social Registration Failed",
-        description: error?.message || `Failed to register with ${provider}`,
+        description: (error as { message?: string })?.message || `Failed to register with ${provider}`,
         variant: "destructive",
       })
     }

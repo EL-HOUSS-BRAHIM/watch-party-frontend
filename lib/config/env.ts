@@ -16,7 +16,7 @@ const normalizeUrl = (value: string | undefined, fallback: string): string => {
   try {
     const url = new URL(value)
     return url.toString().replace(/\/$/, "")
-  } catch (error) {
+  } catch {
     console.warn(`Invalid URL provided ("${value}"). Falling back to ${fallback}`)
     return fallback
   }
