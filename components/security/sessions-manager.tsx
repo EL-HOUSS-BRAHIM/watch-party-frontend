@@ -63,7 +63,7 @@ export function SessionsManager() {
     try {
       setIsLoading(true)
       const response = await api.get("/auth/sessions/")
-      setSessions(response.data.sessions || [])
+      setSessions((response.data as any).sessions || [])
     } catch (err) {
       toast({
         title: "Error",

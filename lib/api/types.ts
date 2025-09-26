@@ -90,6 +90,7 @@ export interface User {
   lastActive?: string
   isStaff?: boolean
   isSuperuser?: boolean
+  is_admin?: boolean
   isVerified?: boolean
   isEmailVerified?: boolean
   twoFactorEnabled?: boolean
@@ -650,6 +651,7 @@ export interface FAQ {
   helpful_count: number
   view_count: number
   is_helpful?: boolean
+  is_published?: boolean
 }
 
 export interface SupportTicket {

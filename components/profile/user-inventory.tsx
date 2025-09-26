@@ -56,7 +56,7 @@ export function UserInventory({ userId }: UserInventoryProps) {
     try {
       setIsLoading(true)
       const response = await api.get(`/users/${userId}/inventory/`)
-      setItems(response.data.items || [])
+      setItems((response.data as any).items || [])
     } catch (err) {
       console.error("Failed to load inventory:", err)
     } finally {
