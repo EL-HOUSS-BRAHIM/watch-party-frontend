@@ -24,7 +24,7 @@ import {
   Filter,
   Grid3X3,
   List,
-  Video,
+  Video as VideoIcon,
   Upload,
   Loader2,
   Trash2,
@@ -33,22 +33,7 @@ import {
   MoreVertical,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-
-interface Video {
-  id: string
-  title: string
-  description: string
-  thumbnail?: string
-  duration_formatted: string
-  file_size: number
-  view_count: number
-  likes: number
-  visibility: "public" | "private" | "unlisted"
-  created_at: string
-  updated_at: string
-  category: string
-  tags: string[]
-}
+import type { Video } from "@/lib/api/types"
 
 export default function VideosPage() {
   const router = useRouter()
@@ -153,7 +138,7 @@ export default function VideosPage() {
             />
           ) : (
             <div className="flex items-center justify-center h-full">
-              <Video className="h-12 w-12 text-muted-foreground" />
+              <VideoIcon className="h-12 w-12 text-muted-foreground" />
             </div>
           )}
 
@@ -194,24 +179,11 @@ export default function VideosPage() {
             </div>
             <div className="flex items-center gap-1">
               <Clock className="w-4 h-4" />
-              {new Date(video.created_at).toLocaleDateString()}
+              {new Date(video.created_at || video.createdAt || new Date()).toLocaleDateString()}
             </div>
           </div>
 
-          {video.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-3">
-              {video.tags.slice(0, 3).map((tag) => (
-                <Badge key={tag} variant="outline" className="text-xs">
-                  #{tag}
-                </Badge>
-              ))}
-              {video.tags.length > 3 && (
-                <Badge variant="outline" className="text-xs">
-                  +{video.tags.length - 3}
-                </Badge>
-              )}
-            </div>
-          )}
+          {/* Remove tags section since it's not in the Video interface */}
 
           <div className="flex items-center justify-between">
             <Button onClick={() => router.push(`/videos/${video.id}`)} size="sm" className="flex-1 mr-2">
@@ -265,7 +237,7 @@ export default function VideosPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Video className="h-8 w-8" />
+              <VideoIcon className="h-8 w-8" />
               Video Library
             </h1>
             <p className="text-muted-foreground mt-2">Manage and organize your video content</p>
@@ -341,14 +313,14 @@ export default function VideosPage() {
         {/* Content */}
         {error ? (
           <div className="text-center py-12">
-            <Video className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <VideoIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-medium mb-2">Error Loading Videos</h3>
             <p className="text-muted-foreground mb-4">There was an error loading your videos.</p>
             <Button onClick={refresh}>Try Again</Button>
           </div>
         ) : !videos?.results?.length ? (
           <div className="text-center py-12">
-            <Video className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <VideoIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-medium mb-2">No Videos Found</h3>
             <p className="text-muted-foreground mb-4">
               {searchQuery ? "No videos match your search criteria." : "You haven't uploaded any videos yet."}

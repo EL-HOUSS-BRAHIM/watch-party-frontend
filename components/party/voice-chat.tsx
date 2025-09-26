@@ -205,11 +205,11 @@ export function VoiceChat({ partyId, isHost, participants }: VoiceChatProps) {
   const toggleDeafen = () => {
     setIsDeafened(!isDeafened)
     // Mute all remote audio when deafened
-    Object.values(peerConnectionsRef.current).forEach(pc => {
-      pc.getRemoteStreams().forEach(stream => {
-        stream.getAudioTracks().forEach(track => {
-          track.enabled = isDeafened
-        })
+    Object.values(peerConnectionsRef.current).forEach((pc: RTCPeerConnection) => {
+      pc.getReceivers().forEach((receiver: RTCRtpReceiver) => {
+        if (receiver.track && receiver.track.kind === 'audio') {
+          receiver.track.enabled = isDeafened
+        }
       })
     })
   }

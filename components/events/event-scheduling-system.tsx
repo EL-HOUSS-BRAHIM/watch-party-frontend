@@ -124,7 +124,7 @@ export default function EventSchedulingSystem() {
         tags: (formData.get("tags") as string).split(",").map((tag) => tag.trim()),
         reminders: ["1 hour", "15 minutes"],
         allow_guest_invites: formData.get("allowGuestInvites") === "on",
-        requireApproval: formData.get("requireApproval") === "on",
+        require_approval: formData.get("requireApproval") === "on",
       }
 
       const newEvent = await eventsAPI.createEvent(eventData)
