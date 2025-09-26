@@ -1,0 +1,289 @@
+__tests__/lib/api/client.test.ts(62,18): error TS2723: Cannot invoke an object which is possibly 'null' or 'undefined'.
+app/dashboard/feedback/page.tsx(153,5): error TS2322: Type 'Resolver<{ title: string; description: string; category: "question" | "other" | "feature" | "bug" | "improvement" | "complaint" | "compliment"; priority: "medium" | "low" | "high" | "urgent"; is_public?: boolean | undefined; tags?: string | undefined; }, any, { ...; }>' is not assignable to type 'Resolver<{ title: string; description: string; category: "question" | "other" | "feature" | "bug" | "improvement" | "complaint" | "compliment"; priority: "medium" | "low" | "high" | "urgent"; is_public: boolean; tags?: string | undefined; }, any, { ...; }>'.
+  Types of parameters 'options' and 'options' are incompatible.
+    Type 'ResolverOptions<{ title: string; description: string; category: "question" | "other" | "feature" | "bug" | "improvement" | "complaint" | "compliment"; priority: "medium" | "low" | "high" | "urgent"; is_public: boolean; tags?: string | undefined; }>' is not assignable to type 'ResolverOptions<{ title: string; description: string; category: "question" | "other" | "feature" | "bug" | "improvement" | "complaint" | "compliment"; priority: "medium" | "low" | "high" | "urgent"; is_public?: boolean | undefined; tags?: string | undefined; }>'.
+      Type 'boolean | undefined' is not assignable to type 'boolean'.
+        Type 'undefined' is not assignable to type 'boolean'.
+app/dashboard/feedback/page.tsx(727,57): error TS2345: Argument of type '(data: z.infer<typeof feedbackSchema>) => Promise<void>' is not assignable to parameter of type 'SubmitHandler<TFieldValues>'.
+  Types of parameters 'data' and 'data' are incompatible.
+    Type 'TFieldValues' is not assignable to type '{ title: string; description: string; category: "question" | "other" | "feature" | "bug" | "improvement" | "complaint" | "compliment"; priority: "medium" | "low" | "high" | "urgent"; is_public: boolean; tags?: string | undefined; }'.
+      Type 'FieldValues' is missing the following properties from type '{ title: string; description: string; category: "question" | "other" | "feature" | "bug" | "improvement" | "complaint" | "compliment"; priority: "medium" | "low" | "high" | "urgent"; is_public: boolean; tags?: string | undefined; }': title, description, category, priority, is_public
+app/dashboard/messages/page.tsx(289,26): error TS18048: 'onlineUser.firstName' is possibly 'undefined'.
+app/dashboard/messages/page.tsx(289,51): error TS18048: 'onlineUser.lastName' is possibly 'undefined'.
+app/dashboard/messages/page.tsx(439,32): error TS2532: Object is possibly 'undefined'.
+app/dashboard/onboarding/page.tsx(141,5): error TS2322: Type 'Resolver<{ allowFriendRequests?: boolean | undefined; allowPartyInvites?: boolean | undefined; shareWatchHistory?: boolean | undefined; findByEmail?: boolean | undefined; }, any, { allowFriendRequests: boolean; allowPartyInvites: boolean; shareWatchHistory: boolean; findByEmail: boolean; }>' is not assignable to type 'Resolver<{ allowFriendRequests: boolean; allowPartyInvites: boolean; shareWatchHistory: boolean; findByEmail: boolean; }, any, { allowFriendRequests: boolean; allowPartyInvites: boolean; shareWatchHistory: boolean; findByEmail: boolean; }>'.
+  Types of parameters 'options' and 'options' are incompatible.
+    Type 'ResolverOptions<{ allowFriendRequests: boolean; allowPartyInvites: boolean; shareWatchHistory: boolean; findByEmail: boolean; }>' is not assignable to type 'ResolverOptions<{ allowFriendRequests?: boolean | undefined; allowPartyInvites?: boolean | undefined; shareWatchHistory?: boolean | undefined; findByEmail?: boolean | undefined; }>'.
+      Type 'boolean | undefined' is not assignable to type 'boolean'.
+        Type 'undefined' is not assignable to type 'boolean'.
+app/dashboard/onboarding/page.tsx(531,55): error TS2345: Argument of type '(data: SocialFormData) => void' is not assignable to parameter of type 'SubmitHandler<TFieldValues>'.
+  Types of parameters 'data' and 'data' are incompatible.
+    Type 'TFieldValues' is not assignable to type '{ allowFriendRequests: boolean; allowPartyInvites: boolean; shareWatchHistory: boolean; findByEmail: boolean; }'.
+      Type 'FieldValues' is missing the following properties from type '{ allowFriendRequests: boolean; allowPartyInvites: boolean; shareWatchHistory: boolean; findByEmail: boolean; }': allowFriendRequests, allowPartyInvites, shareWatchHistory, findByEmail
+app/dashboard/performance/page.tsx(249,29): error TS2339: Property 'cpu' does not exist on type 'SystemHealth'.
+app/dashboard/performance/page.tsx(250,32): error TS2339: Property 'memory' does not exist on type 'SystemHealth'.
+app/dashboard/performance/page.tsx(251,30): error TS2339: Property 'disk' does not exist on type 'SystemHealth'.
+app/dashboard/performance/page.tsx(252,33): error TS2339: Property 'network' does not exist on type 'SystemHealth'.
+app/dashboard/performance/page.tsx(253,32): error TS2339: Property 'status' does not exist on type 'SystemHealth'.
+app/dashboard/quality/page.tsx(112,33): error TS2339: Property 'status' does not exist on type 'SystemHealth'.
+app/dashboard/quality/page.tsx(112,74): error TS2339: Property 'status' does not exist on type 'SystemHealth'.
+app/dashboard/quality/page.tsx(178,34): error TS2339: Property 'status' does not exist on type 'SystemHealth'.
+app/dashboard/settings/integrations/netflix/page.tsx(440,20): error TS18047: 'lastSync' is possibly 'null'.
+app/dashboard/settings/integrations/netflix/page.tsx(440,55): error TS18047: 'lastSync' is possibly 'null'.
+app/dashboard/videos/page.tsx(84,27): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+app/dashboard/videos/page.tsx(146,25): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+app/dashboard/videos/page.tsx(151,29): error TS2345: Argument of type 'number | null | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+app/dashboard/videos/page.tsx(177,31): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+app/dashboard/videos/page.tsx(218,39): error TS2345: Argument of type 'number | null | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+app/dashboard/videos/page.tsx(219,35): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+app/dashboard/videos/page.tsx(274,26): error TS2339: Property 'videos' does not exist on type 'PaginatedResponse<Video>'.
+app/dashboard/videos/page.tsx(309,27): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(value: string | number | Date): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number | Date'.
+      Type 'undefined' is not assignable to type 'string | number | Date'.
+  Overload 2 of 4, '(value: string | number): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+app/dashboard/videos/page.tsx(309,62): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(value: string | number | Date): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number | Date'.
+      Type 'undefined' is not assignable to type 'string | number | Date'.
+  Overload 2 of 4, '(value: string | number): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+app/dashboard/videos/page.tsx(311,27): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(value: string | number | Date): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number | Date'.
+      Type 'undefined' is not assignable to type 'string | number | Date'.
+  Overload 2 of 4, '(value: string | number): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+app/dashboard/videos/page.tsx(311,62): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(value: string | number | Date): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number | Date'.
+      Type 'undefined' is not assignable to type 'string | number | Date'.
+  Overload 2 of 4, '(value: string | number): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+app/dashboard/videos/page.tsx(374,49): error TS2345: Argument of type 'ChangeEvent<HTMLInputElement>' is not assignable to parameter of type 'SetStateAction<string>'.
+app/dashboard/videos/upload/page.tsx(402,54): error TS2345: Argument of type '(prev: VideoMetadata) => { title: ChangeEvent<HTMLInputElement>; description: string; visibility: "public" | "private" | "unlisted"; ... 5 more ...; scheduledPublish?: Date | undefined; }' is not assignable to parameter of type 'SetStateAction<VideoMetadata>'.
+  Type '(prev: VideoMetadata) => { title: ChangeEvent<HTMLInputElement>; description: string; visibility: "public" | "private" | "unlisted"; ... 5 more ...; scheduledPublish?: Date | undefined; }' is not assignable to type '(prevState: VideoMetadata) => VideoMetadata'.
+    Call signature return types '{ title: ChangeEvent<HTMLInputElement>; description: string; visibility: "public" | "private" | "unlisted"; thumbnail?: File | undefined; ... 4 more ...; scheduledPublish?: Date | undefined; }' and 'VideoMetadata' are incompatible.
+      The types of 'title' are incompatible between these types.
+        Type 'ChangeEvent<HTMLInputElement>' is not assignable to type 'string'.
+app/dashboard/videos/upload/page.tsx(434,28): error TS2339: Property 'split' does not exist on type 'ChangeEvent<HTMLInputElement>'.
+app/dashboard/videos/upload/page.tsx(435,33): error TS7006: Parameter 'tag' implicitly has an 'any' type.
+app/videos/page.tsx(372,41): error TS2740: Type 'Video' is missing the following properties from type 'Video': duration_formatted, file_size, view_count, created_at, and 3 more.
+app/videos/page.tsx(378,10): error TS18048: 'videos.results.length' is possibly 'undefined'.
+app/videos/page.tsx(380,22): error TS18047: 'videos' is possibly 'null'.
+app/videos/page.tsx(380,49): error TS18047: 'videos' is possibly 'null'.
+app/videos/page.tsx(380,65): error TS18047: 'videos' is possibly 'null'.
+app/watch/[roomId]/page.tsx(391,9): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+app/watch/[roomId]/page.tsx(392,9): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+app/watch/[roomId]/page.tsx(393,9): error TS2322: Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+components/analytics/advanced-analytics-dashboard.tsx(155,67): error TS2322: Type '"csv" | "pdf"' is not assignable to type '"json" | "csv" | "excel" | undefined'.
+  Type '"pdf"' is not assignable to type '"json" | "csv" | "excel" | undefined'.
+components/analytics/advanced-analytics-dashboard.tsx(222,60): error TS2345: Argument of type 'DateRange' is not assignable to parameter of type 'SetStateAction<{ from: Date; to: Date; }>'.
+  Type 'DateRange' is not assignable to type '{ from: Date; to: Date; }'.
+    Types of property 'from' are incompatible.
+      Type 'Date | undefined' is not assignable to type 'Date'.
+        Type 'undefined' is not assignable to type 'Date'.
+components/analytics/advanced-analytics-dashboard.tsx(426,73): error TS18048: 'percent' is possibly 'undefined'.
+components/analytics/real-time-analytics.tsx(65,7): error TS2451: Cannot redeclare block-scoped variable 'generateTimeSeriesData'.
+components/analytics/real-time-analytics.tsx(106,7): error TS2451: Cannot redeclare block-scoped variable 'generateTimeSeriesData'.
+components/analytics/real-time-analytics.tsx(135,25): error TS2528: A module cannot have multiple default exports.
+components/analytics/real-time-analytics.tsx(278,13): error TS2322: Type 'string' is not assignable to type 'number'.
+components/analytics/real-time-analytics.tsx(591,16): error TS2528: A module cannot have multiple default exports.
+components/analytics/video-analytics-view.tsx(76,70): error TS2554: Expected 1 arguments, but got 2.
+components/analytics/video-analytics-view.tsx(82,27): error TS2339: Property 'views' does not exist on type '{ video: { id: string; title: string; views: number; completion_rate: number; }; engagement: { likes: number; comments: number; shares: number; average_rating: number; }; view_chart: { date: string; views: number; }[]; audience: { ...; }; }'.
+components/analytics/video-analytics-view.tsx(83,27): error TS2339: Property 'likes' does not exist on type '{ video: { id: string; title: string; views: number; completion_rate: number; }; engagement: { likes: number; comments: number; shares: number; average_rating: number; }; view_chart: { date: string; views: number; }[]; audience: { ...; }; }'.
+components/analytics/video-analytics-view.tsx(84,30): error TS2339: Property 'dislikes' does not exist on type '{ video: { id: string; title: string; views: number; completion_rate: number; }; engagement: { likes: number; comments: number; shares: number; average_rating: number; }; view_chart: { date: string; views: number; }[]; audience: { ...; }; }'.
+components/analytics/video-analytics-view.tsx(85,28): error TS2339: Property 'shares' does not exist on type '{ video: { id: string; title: string; views: number; completion_rate: number; }; engagement: { likes: number; comments: number; shares: number; average_rating: number; }; view_chart: { date: string; views: number; }[]; audience: { ...; }; }'.
+components/analytics/video-analytics-view.tsx(86,30): error TS2339: Property 'comments' does not exist on type '{ video: { id: string; title: string; views: number; completion_rate: number; }; engagement: { likes: number; comments: number; shares: number; average_rating: number; }; view_chart: { date: string; views: number; }[]; audience: { ...; }; }'.
+components/analytics/video-analytics-view.tsx(87,31): error TS2339: Property 'total_watch_time' does not exist on type '{ video: { id: string; title: string; views: number; completion_rate: number; }; engagement: { likes: number; comments: number; shares: number; average_rating: number; }; view_chart: { date: string; views: number; }[]; audience: { ...; }; }'.
+components/analytics/video-analytics-view.tsx(88,34): error TS2339: Property 'avg_watch_time' does not exist on type '{ video: { id: string; title: string; views: number; completion_rate: number; }; engagement: { likes: number; comments: number; shares: number; average_rating: number; }; view_chart: { date: string; views: number; }[]; audience: { ...; }; }'.
+components/analytics/video-analytics-view.tsx(89,35): error TS2339: Property 'retention_rate' does not exist on type '{ video: { id: string; title: string; views: number; completion_rate: number; }; engagement: { likes: number; comments: number; shares: number; average_rating: number; }; view_chart: { date: string; views: number; }[]; audience: { ...; }; }'.
+components/analytics/video-analytics-view.tsx(90,36): error TS2339: Property 'completion_rate' does not exist on type '{ video: { id: string; title: string; views: number; completion_rate: number; }; engagement: { likes: number; comments: number; shares: number; average_rating: number; }; view_chart: { date: string; views: number; }[]; audience: { ...; }; }'.
+components/analytics/video-analytics-view.tsx(93,32): error TS2339: Property 'viewer_data' does not exist on type '{ video: { id: string; title: string; views: number; completion_rate: number; }; engagement: { likes: number; comments: number; shares: number; average_rating: number; }; view_chart: { date: string; views: number; }[]; audience: { ...; }; }'.
+components/billing/chat/chat-interface.tsx(49,28): error TS2554: Expected 1 arguments, but got 0.
+components/billing/chat/chat-moderation.tsx(115,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/billing/chat/chat-moderation.tsx(116,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/billing/chat/chat-moderation.tsx(117,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/billing/chat/chat-moderation.tsx(120,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/billing/chat/chat-moderation.tsx(121,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/billing/chat/chat-moderation.tsx(122,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/billing/chat/chat-moderation.tsx(162,17): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/billing/chat/chat-moderation.tsx(184,17): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/billing/chat/chat-moderation.tsx(207,17): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/billing/chat/chat-moderation.tsx(553,30): error TS2304: Cannot find name 'X'.
+components/events/event-scheduling-system.tsx(44,62): error TS2305: Module '"@/lib/api/types"' has no exported member 'EventFilters'.
+components/events/event-scheduling-system.tsx(116,9): error TS2561: Object literal may only specify known properties, but 'startTime' does not exist in type 'CreateEventRequest'. Did you mean to write 'start_time'?
+components/events/event-scheduling-system.tsx(154,44): error TS2345: Argument of type 'string' is not assignable to parameter of type 'EventRSVP'.
+  Type 'string' is not assignable to type 'EventRSVP'.
+components/events/event-scheduling-system.tsx(182,17): error TS2551: Property 'meetingLink' does not exist on type 'WatchEvent'. Did you mean 'meeting_link'?
+components/events/event-scheduling-system.tsx(183,27): error TS2551: Property 'meetingLink' does not exist on type 'WatchEvent'. Did you mean 'meeting_link'?
+components/events/event-scheduling-system.tsx(269,83): error TS2551: Property 'startTime' does not exist on type 'WatchEvent'. Did you mean 'start_time'?
+components/events/event-scheduling-system.tsx(465,52): error TS2551: Property 'startTime' does not exist on type 'WatchEvent'. Did you mean 'start_time'?
+components/events/event-scheduling-system.tsx(465,100): error TS2551: Property 'endTime' does not exist on type 'WatchEvent'. Did you mean 'end_time'?
+components/events/event-scheduling-system.tsx(472,34): error TS2551: Property 'rsvpStatus' does not exist on type 'WatchEvent'. Did you mean 'rsvp_status'?
+components/events/event-scheduling-system.tsx(473,72): error TS2551: Property 'rsvpStatus' does not exist on type 'WatchEvent'. Did you mean 'rsvp_status'?
+components/events/event-scheduling-system.tsx(473,92): error TS2551: Property 'rsvpStatus' does not exist on type 'WatchEvent'. Did you mean 'rsvp_status'?
+components/events/event-scheduling-system.tsx(482,36): error TS2551: Property 'currentAttendees' does not exist on type 'WatchEvent'. Did you mean 'current_attendees'?
+components/events/event-scheduling-system.tsx(482,61): error TS2551: Property 'maxAttendees' does not exist on type 'WatchEvent'. Did you mean 'max_attendees'?
+components/events/event-scheduling-system.tsx(501,67): error TS2551: Property 'rsvpStatus' does not exist on type 'WatchEvent'. Did you mean 'rsvp_status'?
+components/events/event-scheduling-system.tsx(512,34): error TS2551: Property 'isHost' does not exist on type 'WatchEvent'. Did you mean 'is_host'?
+components/events/event-scheduling-system.tsx(551,28): error TS2551: Property 'rsvpStatus' does not exist on type 'WatchEvent'. Did you mean 'rsvp_status'?
+components/events/event-scheduling-system.tsx(552,66): error TS2551: Property 'rsvpStatus' does not exist on type 'WatchEvent'. Did you mean 'rsvp_status'?
+components/events/event-scheduling-system.tsx(552,86): error TS2551: Property 'rsvpStatus' does not exist on type 'WatchEvent'. Did you mean 'rsvp_status'?
+components/events/event-scheduling-system.tsx(562,48): error TS2551: Property 'startTime' does not exist on type 'WatchEvent'. Did you mean 'start_time'?
+components/events/event-scheduling-system.tsx(567,48): error TS2551: Property 'startTime' does not exist on type 'WatchEvent'. Did you mean 'start_time'?
+components/events/event-scheduling-system.tsx(567,96): error TS2551: Property 'endTime' does not exist on type 'WatchEvent'. Did you mean 'end_time'?
+components/events/event-scheduling-system.tsx(572,32): error TS2551: Property 'currentAttendees' does not exist on type 'WatchEvent'. Did you mean 'current_attendees'?
+components/events/event-scheduling-system.tsx(572,57): error TS2551: Property 'maxAttendees' does not exist on type 'WatchEvent'. Did you mean 'max_attendees'?
+components/events/event-scheduling-system.tsx(601,65): error TS2551: Property 'rsvpStatus' does not exist on type 'WatchEvent'. Did you mean 'rsvp_status'?
+components/events/event-scheduling-system.tsx(620,32): error TS2551: Property 'isHost' does not exist on type 'WatchEvent'. Did you mean 'is_host'?
+components/events/event-scheduling-system.tsx(676,58): error TS2551: Property 'startTime' does not exist on type 'WatchEvent'. Did you mean 'start_time'?
+components/events/event-scheduling-system.tsx(680,58): error TS2551: Property 'startTime' does not exist on type 'WatchEvent'. Did you mean 'start_time'?
+components/events/event-scheduling-system.tsx(681,58): error TS2551: Property 'endTime' does not exist on type 'WatchEvent'. Did you mean 'end_time'?
+components/events/event-scheduling-system.tsx(685,42): error TS2551: Property 'currentAttendees' does not exist on type 'WatchEvent'. Did you mean 'current_attendees'?
+components/events/event-scheduling-system.tsx(685,75): error TS2551: Property 'maxAttendees' does not exist on type 'WatchEvent'. Did you mean 'max_attendees'?
+components/events/event-scheduling-system.tsx(711,32): error TS18048: 'selectedEvent.video' is possibly 'undefined'.
+components/events/event-scheduling-system.tsx(712,32): error TS18048: 'selectedEvent.video' is possibly 'undefined'.
+components/events/event-scheduling-system.tsx(716,55): error TS18048: 'selectedEvent.video' is possibly 'undefined'.
+components/events/event-scheduling-system.tsx(718,41): error TS18048: 'selectedEvent.video' is possibly 'undefined'.
+components/events/event-scheduling-system.tsx(753,62): error TS2551: Property 'rsvpDate' does not exist on type 'EventAttendee'. Did you mean 'rsvp_date'?
+components/i18n/LanguageSwitcher.tsx(52,11): error TS2339: Property 'currentLanguage' does not exist on type 'I18nContextType'.
+components/i18n/LanguageSwitcher.tsx(159,44): error TS2345: Argument of type '"language.title"' is not assignable to parameter of type '"dashboard.title" | "auth.login.title" | "auth.login.email" | "auth.login.submit" | "auth.login.register" | "auth.login.password" | "auth.login.forgot" | "auth.register.title" | ... 34 more ... | "dashboard.stats.hours"'.
+components/i18n/LanguageSwitcher.tsx(162,35): error TS2345: Argument of type '"language.available"' is not assignable to parameter of type '"dashboard.title" | "auth.login.title" | "auth.login.email" | "auth.login.submit" | "auth.login.register" | "auth.login.password" | "auth.login.forgot" | "auth.register.title" | ... 34 more ... | "dashboard.stats.hours"'.
+components/i18n/LanguageSwitcher.tsx(177,20): error TS2345: Argument of type '"language.current"' is not assignable to parameter of type '"dashboard.title" | "auth.login.title" | "auth.login.email" | "auth.login.submit" | "auth.login.register" | "auth.login.password" | "auth.login.forgot" | "auth.register.title" | ... 34 more ... | "dashboard.stats.hours"'.
+components/i18n/LanguageSwitcher.tsx(186,20): error TS2345: Argument of type '"language.change"' is not assignable to parameter of type '"dashboard.title" | "auth.login.title" | "auth.login.email" | "auth.login.submit" | "auth.login.register" | "auth.login.password" | "auth.login.forgot" | "auth.register.title" | ... 34 more ... | "dashboard.stats.hours"'.
+components/i18n/LanguageSwitcher.tsx(235,22): error TS2345: Argument of type '"language.rtl_notice"' is not assignable to parameter of type '"dashboard.title" | "auth.login.title" | "auth.login.email" | "auth.login.submit" | "auth.login.register" | "auth.login.password" | "auth.login.forgot" | "auth.register.title" | ... 34 more ... | "dashboard.stats.hours"'.
+components/i18n/LanguageSwitcher.tsx(242,16): error TS2345: Argument of type '"language.help"' is not assignable to parameter of type '"dashboard.title" | "auth.login.title" | "auth.login.email" | "auth.login.submit" | "auth.login.register" | "auth.login.password" | "auth.login.forgot" | "auth.register.title" | ... 34 more ... | "dashboard.stats.hours"'.
+components/i18n/LanguageSwitcher.tsx(244,18): error TS2345: Argument of type '"language.contribute"' is not assignable to parameter of type '"dashboard.title" | "auth.login.title" | "auth.login.email" | "auth.login.submit" | "auth.login.register" | "auth.login.password" | "auth.login.forgot" | "auth.register.title" | ... 34 more ... | "dashboard.stats.hours"'.
+components/integrations/integration-api-system.tsx(22,44): error TS7016: Could not find a declaration file for module 'react-syntax-highlighter'. '/home/runner/work/watch-party-frontend/watch-party-frontend/node_modules/react-syntax-highlighter/dist/cjs/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/react-syntax-highlighter` if it exists or add a new declaration (.d.ts) file containing `declare module 'react-syntax-highlighter';`
+components/integrations/integration-api-system.tsx(23,26): error TS7016: Could not find a declaration file for module 'react-syntax-highlighter/dist/esm/styles/prism'. '/home/runner/work/watch-party-frontend/watch-party-frontend/node_modules/react-syntax-highlighter/dist/esm/styles/prism/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/react-syntax-highlighter` if it exists or add a new declaration (.d.ts) file containing `declare module 'react-syntax-highlighter/dist/esm/styles/prism';`
+components/integrations/integration-api-system.tsx(149,30): error TS2339: Property 'google_drive' does not exist on type 'HealthStatus'.
+components/integrations/integration-api-system.tsx(150,42): error TS2339: Property 'google_drive' does not exist on type 'HealthStatus'.
+components/integrations/integration-api-system.tsx(151,32): error TS2339: Property 'google_drive' does not exist on type 'HealthStatus'.
+components/integrations/integration-api-system.tsx(160,30): error TS2339: Property 's3_storage' does not exist on type 'HealthStatus'.
+components/integrations/integration-api-system.tsx(161,40): error TS2339: Property 's3_storage' does not exist on type 'HealthStatus'.
+components/integrations/integration-api-system.tsx(162,32): error TS2339: Property 's3_storage' does not exist on type 'HealthStatus'.
+components/notifications/push-permission-registration.tsx(178,9): error TS2322: Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'string | BufferSource | null | undefined'.
+  Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.
+    Types of property 'buffer' are incompatible.
+      Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+        Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer': resizable, resize, detached, transfer, transferToFixedLength
+components/party/interactive-polls.tsx(74,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/interactive-polls.tsx(75,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/interactive-polls.tsx(76,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/interactive-polls.tsx(79,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/interactive-polls.tsx(80,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/interactive-polls.tsx(81,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/interactive-polls.tsx(158,17): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/interactive-polls.tsx(172,17): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/party-analytics-modal.tsx(231,67): error TS18048: 'percent' is possibly 'undefined'.
+components/party/screen-sharing.tsx(69,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(70,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(71,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(72,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(73,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(76,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(77,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(78,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(79,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(80,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(92,24): error TS2552: Cannot find name 'DisplayMediaStreamConstraints'. Did you mean 'MediaStreamConstraints'?
+components/party/screen-sharing.tsx(141,15): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(163,13): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(201,17): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(219,13): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(251,19): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(263,13): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(279,13): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/screen-sharing.tsx(284,15): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(75,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(76,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(77,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(78,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(79,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(80,14): error TS2339: Property 'on' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(83,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(84,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(85,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(86,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(87,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(88,16): error TS2339: Property 'off' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(129,15): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(140,13): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(200,17): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(209,10): error TS2339: Property 'getRemoteStreams' does not exist on type 'RTCPeerConnection'.
+components/party/voice-chat.tsx(209,37): error TS7006: Parameter 'stream' implicitly has an 'any' type.
+components/party/voice-chat.tsx(210,41): error TS7006: Parameter 'track' implicitly has an 'any' type.
+components/party/voice-chat.tsx(235,13): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(271,17): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/party/voice-chat.tsx(291,15): error TS2339: Property 'emit' does not exist on type 'WebSocket'.
+components/seo/seo-accessibility-optimizer.tsx(80,7): error TS7034: Variable 'seoTrends' implicitly has type 'any[]' in some locations where its type cannot be determined.
+components/seo/seo-accessibility-optimizer.tsx(703,34): error TS7005: Variable 'seoTrends' implicitly has an 'any[]' type.
+components/social/friend-requests.tsx(191,44): error TS2339: Property 'mutualFriends' does not exist on type '{ id: string; username: string; firstName: string; lastName: string; avatar?: string | undefined; }'.
+components/social/friend-requests.tsx(193,34): error TS2339: Property 'mutualFriends' does not exist on type '{ id: string; username: string; firstName: string; lastName: string; avatar?: string | undefined; }'.
+components/social/friend-requests.tsx(193,73): error TS2339: Property 'mutualFriends' does not exist on type '{ id: string; username: string; firstName: string; lastName: string; avatar?: string | undefined; }'.
+components/social/online-status-indicators.tsx(58,38): error TS2339: Property 'type' does not exist on type '{ type: "watching" | "in_party" | "browsing"; details: string; partyId?: string | undefined; videoId?: string | undefined; } | undefined'.
+components/social/smart-friend-search.tsx(185,51): error TS2345: Argument of type 'Record<string, any>' is not assignable to parameter of type '{ q: string; limit?: number | undefined; sort?: string | undefined; location?: string | undefined; has_avatar?: boolean | undefined; is_online?: boolean | undefined; verified?: boolean | undefined; min_mutual_friends?: number | undefined; genres?: string[] | undefined; }'.
+  Property 'q' is missing in type 'Record<string, any>' but required in type '{ q: string; limit?: number | undefined; sort?: string | undefined; location?: string | undefined; has_avatar?: boolean | undefined; is_online?: boolean | undefined; verified?: boolean | undefined; min_mutual_friends?: number | undefined; genres?: string[] | undefined; }'.
+components/store/store-purchase-modal.tsx(90,11): error TS18046: 'response.data' is of type 'unknown'.
+components/store/store-purchase-modal.tsx(91,26): error TS18046: 'response.data' is of type 'unknown'.
+components/store/store-purchase-modal.tsx(94,27): error TS18046: 'response.data' is of type 'unknown'.
+components/testing/testing-suite-dashboard.tsx(639,29): error TS2304: Cannot find name 'coverageData'.
+components/testing/testing-suite-dashboard.tsx(647,24): error TS2304: Cannot find name 'coverageData'.
+components/testing/testing-suite-dashboard.tsx(647,42): error TS7006: Parameter 'entry' implicitly has an 'any' type.
+components/testing/testing-suite-dashboard.tsx(647,49): error TS7006: Parameter 'index' implicitly has an 'any' type.
+components/testing/testing-suite-dashboard.tsx(665,20): error TS2304: Cannot find name 'coverageData'.
+components/testing/testing-suite-dashboard.tsx(665,38): error TS7006: Parameter 'item' implicitly has an 'any' type.
+components/testing/testing-suite-dashboard.tsx(796,34): error TS2304: Cannot find name 'testTrends'.
+components/ui/chart.tsx(119,7): error TS2339: Property 'payload' does not exist on type 'Omit<Omit<Props<ValueType, NameType>, PropertiesReadFromContext> & { active?: boolean | undefined; includeHidden?: boolean | undefined; ... 17 more ...; axisId?: AxisId | undefined; } & ClassAttributes<...> & HTMLAttributes<...> & { ...; }, "ref">'.
+components/ui/chart.tsx(124,7): error TS2339: Property 'label' does not exist on type 'Omit<Omit<Props<ValueType, NameType>, PropertiesReadFromContext> & { active?: boolean | undefined; includeHidden?: boolean | undefined; ... 17 more ...; axisId?: AxisId | undefined; } & ClassAttributes<...> & HTMLAttributes<...> & { ...; }, "ref">'.
+components/ui/chart.tsx(188,25): error TS7006: Parameter 'item' implicitly has an 'any' type.
+components/ui/chart.tsx(188,31): error TS7006: Parameter 'index' implicitly has an 'any' type.
+components/ui/chart.tsx(264,41): error TS2344: Type '"payload" | "verticalAlign"' does not satisfy the constraint '"string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | "strokeWidth" | "fontFamily" | "fontSize" | "fontWeight" | "letterSpacing" | ... 430 more ... | "portal"'.
+  Type '"payload"' is not assignable to type '"string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | "strokeWidth" | "fontFamily" | "fontSize" | "fontWeight" | "letterSpacing" | ... 430 more ... | "portal"'.
+components/ui/chart.tsx(275,19): error TS2339: Property 'length' does not exist on type '{}'.
+components/ui/chart.tsx(288,18): error TS2339: Property 'map' does not exist on type '{}'.
+components/ui/chart.tsx(288,23): error TS7006: Parameter 'item' implicitly has an 'any' type.
+components/ui/mobile-video-controls.tsx(46,20): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(timeout: string | number | Timeout | undefined): void', gave the following error.
+    Argument of type 'Timeout | null' is not assignable to parameter of type 'string | number | Timeout | undefined'.
+      Type 'null' is not assignable to type 'string | number | Timeout | undefined'.
+  Overload 2 of 2, '(id: number | undefined): void', gave the following error.
+    Argument of type 'Timeout | null' is not assignable to parameter of type 'number | undefined'.
+      Type 'null' is not assignable to type 'number | undefined'.
+components/ui/mobile-video-controls.tsx(52,31): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(timeout: string | number | Timeout | undefined): void', gave the following error.
+    Argument of type 'Timeout | null' is not assignable to parameter of type 'string | number | Timeout | undefined'.
+      Type 'null' is not assignable to type 'string | number | Timeout | undefined'.
+  Overload 2 of 2, '(id: number | undefined): void', gave the following error.
+    Argument of type 'Timeout | null' is not assignable to parameter of type 'number | undefined'.
+      Type 'null' is not assignable to type 'number | undefined'.
+components/video/stream-analytics-overlay.tsx(60,47): error TS2339: Property 'current_viewers' does not exist on type 'VideoAnalytics'.
+components/video/stream-analytics-overlay.tsx(61,34): error TS2339: Property 'peak_viewers' does not exist on type 'VideoAnalytics'.
+components/video/stream-analytics-overlay.tsx(62,33): error TS2339: Property 'total_views' does not exist on type 'VideoAnalytics'.
+components/video/stream-analytics-overlay.tsx(63,40): error TS2339: Property 'average_watch_time' does not exist on type 'VideoAnalytics'.
+components/video/stream-analytics-overlay.tsx(64,51): error TS2339: Property 'hourly_stats' does not exist on type 'VideoAnalytics'.
+components/video/stream-analytics-overlay.tsx(65,24): error TS2339: Property 'hourly_stats' does not exist on type 'VideoAnalytics'.
+components/video/stream-analytics-overlay.tsx(71,51): error TS2339: Property 'retention_data' does not exist on type 'VideoAnalytics'.
+components/video/stream-analytics-overlay.tsx(72,24): error TS2339: Property 'retention_data' does not exist on type 'VideoAnalytics'.
+components/video/stream-analytics-overlay.tsx(77,52): error TS2339: Property 'geographic_data' does not exist on type 'VideoAnalytics'.
+components/video/stream-analytics-overlay.tsx(78,24): error TS2339: Property 'geographic_data' does not exist on type 'VideoAnalytics'.
+lib/api/transformers.ts(130,28): error TS2339: Property 'email' does not exist on type '{ id: string; username?: string | undefined; first_name?: string | undefined; last_name?: string | undefined; display_name?: string | undefined; avatar?: string | undefined; is_premium?: boolean | undefined; }'.
+lib/performance/cache.ts(21,25): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
