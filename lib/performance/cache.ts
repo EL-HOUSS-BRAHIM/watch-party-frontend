@@ -62,7 +62,7 @@ export function useCache<T>(key: string, fetcher: () => Promise<T>, options: Cac
   const fetchData = useCallback(async () => {
     const cached = globalCache.get(key)
     if (cached) {
-      setData(cached)
+      setData(cached as T)
       return cached
     }
 

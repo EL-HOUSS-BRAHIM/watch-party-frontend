@@ -4,13 +4,13 @@ import { lazy, type ComponentType, type ComponentProps, Suspense } from "react"
 import { useState, useCallback, useEffect, useRef } from "react"
 
 // Lazy loading utility with error boundary
-export function createLazyComponent<T extends ComponentType<Record<string, unknown>>>(
+export function createLazyComponent<T extends ComponentType>(
   importFunc: () => Promise<{ default: T }>,
   fallback?: ComponentType,
 ) {
   const LazyComponent = lazy(importFunc)
 
-  const WrappedComponent = (props: ComponentProps<T>) => {
+  const WrappedComponent = (props: T extends ComponentType<infer P> ? P : never) => {
     const FallbackComponent = fallback
     return (
       <Suspense fallback={FallbackComponent ? <FallbackComponent /> : <div>Loading...</div>}>
@@ -19,7 +19,7 @@ export function createLazyComponent<T extends ComponentType<Record<string, unkno
     )
   }
   
-  WrappedComponent.displayName = `LazyComponent(${LazyComponent.displayName || LazyComponent.name || 'Anonymous'})`
+  WrappedComponent.displayName = `LazyComponent(${importFunc.name || 'Anonymous'})`
   
   return WrappedComponent
 }

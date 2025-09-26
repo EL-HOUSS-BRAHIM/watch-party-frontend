@@ -182,7 +182,7 @@ function TwoFactorVerifyForm() {
         return
       }
 
-      const message = data?.message || error?.message || "Verification failed. Please try again."
+      const message = data?.message || (error instanceof Error ? error.message : "Verification failed. Please try again.")
       setErrors({
         [useBackupCode ? "backup" : "code"]: message,
       })
