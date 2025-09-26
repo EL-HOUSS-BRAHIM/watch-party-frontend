@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -17,24 +16,17 @@ import {
   Shield,
   AlertTriangle,
   Search,
-  Filter,
   Eye,
   CheckCircle,
   XCircle,
-  Clock,
   User,
-  MessageCircle,
   Flag,
   Ban,
   AlertCircle,
-  Archive,
-  MoreHorizontal,
   FileText,
   Calendar,
-  MapPin,
   Loader2,
   ChevronRight,
-  Trash2,
   UserX,
   MessageSquare,
   Image as ImageIcon,

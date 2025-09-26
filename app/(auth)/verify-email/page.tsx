@@ -89,48 +89,7 @@ function EmailVerificationHandler() {
     }
   }, [resendCooldown])
 
-  const resendVerificationEmail = async () => {
-      const response = await fetch("/api/auth/verify-email/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token,
-          email,
-        }),
-      })
 
-      const data = await response.json()
-
-      if (response.ok) {
-        setStatus("success")
-        setMessage("Your email has been successfully verified! You can now sign in to your account.")
-
-        toast({
-          title: "Email Verified!",
-          description: "Your account is now active. You can sign in.",
-        })
-
-        // Redirect to login after a delay
-        setTimeout(() => {
-          router.push("/login?message=email-verified")
-        }, 3000)
-      } else {
-        if (response.status === 410) {
-          setStatus("expired")
-          setMessage("This verification link has expired. Please request a new one.")
-        } else {
-          setStatus("error")
-          setMessage(data.message || "Email verification failed. Please try again.")
-        }
-      }
-    } catch (error) {
-      console.error("Email verification error:", error)
-      setStatus("error")
-      setMessage("An unexpected error occurred. Please try again.")
-    }
-  }
 
   const resendVerificationEmail = async () => {
     setIsResending(true)
