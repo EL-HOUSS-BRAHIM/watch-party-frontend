@@ -246,11 +246,11 @@ const PerformancePage = () => {
       // Transform system health
       if (systemHealth) {
         setSystemHealth({
-          cpu: systemHealth.cpu || 34,
-          memory: systemHealth.memory || 67,
-          disk: systemHealth.disk || 45,
-          network: systemHealth.network || 12,
-          status: systemHealth.status || "healthy",
+          cpu: systemHealth.metrics?.cpu_usage || 34,
+          memory: systemHealth.metrics?.memory_usage || 67,
+          disk: systemHealth.metrics?.disk_usage || 45,
+          network: parseFloat(systemHealth.metrics?.network_io || "12") || 12,
+          status: systemHealth.overall_status || "healthy",
         })
       }
 

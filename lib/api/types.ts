@@ -995,6 +995,8 @@ export interface Video {
   }
   thumbnail?: string | null
   duration?: number
+  duration_formatted?: string  // Added for UI compatibility
+  file_size?: number           // Added for UI compatibility (renamed from size)
   size?: number | null
   sourceType?: 'upload' | 'url' | 'drive'
   sourceUrl?: string
@@ -1007,12 +1009,14 @@ export interface Video {
   allowDownload?: boolean
   requirePremium?: boolean
   views: number
+  view_count: number           // Added for UI compatibility
   likes: number
   comments: number
   isLiked?: boolean
   canEdit?: boolean
   canDownload?: boolean
   createdAt?: string
+  created_at?: string          // Added for UI compatibility
   updatedAt?: string
   uploadedAt?: string
   uploadProgress?: number

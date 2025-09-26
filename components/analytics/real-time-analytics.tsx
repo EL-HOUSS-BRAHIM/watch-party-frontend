@@ -61,21 +61,18 @@ interface ActiveRoom {
   createdAt: Date;
 }
 
-// Helper function to generate time series data
-const generateTimeSeriesData = () => {
-  const data = [];
-  const now = new Date();
-  for (let i = 29; i >= 0; i--) {
-    const time = new Date(now.getTime() - i * 60000);
-    data.push({
-      time: time.toLocaleTimeString('en-US', { hour12: false }),
+// Generate time series data for charts
+const generateTimeSeriesData = (hours: number = 24) => {
+  return Array.from({ length: hours }, (_, i) => {
+    const time = new Date(Date.now() - (hours - i - 1) * 60 * 60 * 1000);
+    return {
+      time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       users: Math.floor(Math.random() * 500) + 800,
       streams: Math.floor(Math.random() * 100) + 200,
       messages: Math.floor(Math.random() * 200) + 400,
-      bandwidth: Math.random() * 2 + 1,
-    });
-  }
-  return data;
+      bandwidth: parseFloat((Math.random() * 2 + 1).toFixed(1)),
+    };
+  });
 };
 
 const mockLiveUsers: LiveUser[] = Array.from({ length: 25 }, (_, i) => ({
@@ -102,19 +99,7 @@ const mockActiveRooms: ActiveRoom[] = Array.from({ length: 8 }, (_, i) => ({
   createdAt: new Date(Date.now() - Math.random() * 86400000),
 }));
 
-// Generate time series data for charts
-const generateTimeSeriesData = (hours: number = 24) => {
-  return Array.from({ length: hours }, (_, i) => {
-    const time = new Date(Date.now() - (hours - i - 1) * 60 * 60 * 1000);
-    return {
-      time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      users: Math.floor(Math.random() * 500) + 800,
-      streams: Math.floor(Math.random() * 200) + 200,
-      messages: Math.floor(Math.random() * 1000) + 500,
-      bandwidth: (Math.random() * 2 + 1).toFixed(1),
-    };
-  });
-};
+
 
 const deviceData = [
   { name: 'Desktop', value: 45, fill: '#3b82f6' },
@@ -275,7 +260,7 @@ export default function RealTimeAnalytics() {
             users: Math.floor(Math.random() * 500) + 800,
             streams: Math.floor(Math.random() * 200) + 200,
             messages: Math.floor(Math.random() * 1000) + 500,
-            bandwidth: (Math.random() * 2 + 1).toFixed(1),
+            bandwidth: parseFloat((Math.random() * 2 + 1).toFixed(1)),
           });
           return newData;
         });
@@ -588,4 +573,4 @@ export default function RealTimeAnalytics() {
   );
 }
 
-export default RealTimeAnalytics;
+
