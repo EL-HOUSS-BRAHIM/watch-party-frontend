@@ -56,26 +56,27 @@ export function StreamAnalyticsOverlay({ videoId, isLive = false, onClose }: Str
       const response = await videosAPI.getAnalytics(videoId)
       
       if (response) {
+        const extendedResponse = response as any // Type assertion to handle API mismatch
         const normalizedData: StreamAnalyticsData = {
-          current_viewers: isLive ? (response.current_viewers ?? 0) : 0,
-          peak_viewers: response.peak_viewers ?? 0,
-          total_views: response.total_views ?? 0,
-          average_watch_time: response.average_watch_time ?? 0,
-          watch_time_data: Array.isArray(response.hourly_stats) 
-            ? response.hourly_stats.map((stat: any) => ({
+          current_viewers: isLive ? (extendedResponse.current_viewers ?? 0) : 0,
+          peak_viewers: extendedResponse.peak_viewers ?? 0,
+          total_views: extendedResponse.total_views ?? response.view_count ?? 0,
+          average_watch_time: extendedResponse.average_watch_time ?? response.average_view_duration ?? 0,
+          watch_time_data: Array.isArray(extendedResponse.hourly_stats) 
+            ? extendedResponse.hourly_stats.map((stat: any) => ({
                 time: stat.hour ?? stat.time ?? '0:00',
                 viewers: stat.viewers ?? stat.view_count ?? 0,
                 retention: stat.retention_percentage ?? stat.retention ?? 0
               }))
             : [],
-          retention_curve: Array.isArray(response.retention_data)
-            ? response.retention_data.map((point: any) => ({
+          retention_curve: Array.isArray(extendedResponse.retention_data)
+            ? extendedResponse.retention_data.map((point: any) => ({
                 timestamp: point.timestamp ?? point.time ?? 0,
                 percentage: point.percentage ?? point.retention ?? 0
               }))
             : [],
-          viewer_locations: Array.isArray(response.geographic_data)
-            ? response.geographic_data.map((geo: any) => ({
+          viewer_locations: Array.isArray(extendedResponse.geographic_data)
+            ? extendedResponse.geographic_data.map((geo: any) => ({
                 country: geo.country ?? geo.location ?? 'Unknown',
                 viewers: geo.viewers ?? geo.view_count ?? 0
               }))

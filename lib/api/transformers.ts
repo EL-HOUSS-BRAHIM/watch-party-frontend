@@ -156,6 +156,7 @@ export const transformVideo = (raw: RawVideo | Video): Video => {
     allowDownload: video.allow_download ?? undefined,
     requirePremium: video.require_premium ?? undefined,
     views: video.view_count ?? 0,
+    view_count: video.view_count ?? 0,
     likes: video.like_count ?? 0,
     comments: video.comments_count ?? 0,
     isLiked: video.is_liked ?? undefined,

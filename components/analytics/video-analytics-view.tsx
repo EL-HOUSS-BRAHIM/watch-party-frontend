@@ -73,24 +73,32 @@ const VideoAnalyticsView = ({ videoId }: VideoAnalyticsProps) => {
   const fetchAnalytics = async () => {
     try {
       setLoading(true)
-      const response = await analyticsAPI.getVideoAnalytics(videoId, {
-        date_range: dateRange
-      })
+      const response = await analyticsAPI.getVideoAnalytics(videoId)
       
       if (response) {
         setStats({
-          views: response.views || 0,
-          likes: response.likes || 0,
-          dislikes: response.dislikes || 0,
-          shares: response.shares || 0,
-          comments: response.comments || 0,
-          watchTime: response.total_watch_time || 0,
-          avgWatchTime: response.avg_watch_time || 0,
-          retentionRate: response.retention_rate || 0,
-          completionRate: response.completion_rate || 0
+          views: response.video?.views || 0,
+          likes: response.engagement?.likes || 0,
+          dislikes: 0, // Not provided by API
+          shares: response.engagement?.shares || 0,
+          comments: response.engagement?.comments || 0,
+          watchTime: 0, // Not provided by API
+          avgWatchTime: 0, // Not provided by API
+          retentionRate: response.video?.completion_rate || 0,
+          completionRate: response.video?.completion_rate || 0
         })
         
-        setViewerData(response.viewer_data || [])
+        // Transform view chart data to match expected format
+        const transformedViewerData = response.view_chart?.map((item: any) => ({
+          timestamp: item.date,
+          viewers: item.views,
+          country: 'Unknown',
+          device: 'Unknown',
+          age: 'Unknown',
+          gender: 'Unknown'
+        })) || []
+        
+        setViewerData(transformedViewerData)
       }
     } catch (error) {
       console.error('Failed to fetch video analytics:', error)

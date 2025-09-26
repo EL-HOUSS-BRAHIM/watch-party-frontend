@@ -89,7 +89,7 @@ export function ScreenSharing({ partyId, isHost, participants }: ScreenSharingPr
   }, [])
 
   const getDisplayMedia = async (): Promise<MediaStream> => {
-    const constraints: DisplayMediaStreamConstraints = {
+    const constraints: MediaStreamConstraints = {
       video: {
         width: { ideal: getResolution().width },
         height: { ideal: getResolution().height },
