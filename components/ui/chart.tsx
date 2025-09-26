@@ -125,7 +125,7 @@ const ChartTooltipContent = React.forwardRef<
     formatter?: (value: any, name: string, item: any, index: number) => React.ReactNode
     color?: string
   } & React.ComponentProps<"div">
->((
+>(
   (
     {
       active,
@@ -267,6 +267,7 @@ const ChartTooltipContent = React.forwardRef<
     )
   }
 )
+
 ChartTooltipContent.displayName = "ChartTooltip"
 
 const ChartLegend = RechartsPrimitive.Legend
