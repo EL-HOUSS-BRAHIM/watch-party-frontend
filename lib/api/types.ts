@@ -858,6 +858,12 @@ export interface HealthStatus {
     status: 'up' | 'down'
     response_time?: number
   }>
+  // Integration-specific health status
+  google_drive?: boolean
+  s3_storage?: boolean
+  discord?: boolean
+  slack?: boolean
+  webhooks?: boolean
 }
 
 // Video Types
