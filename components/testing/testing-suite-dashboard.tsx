@@ -81,6 +81,8 @@ export function TestingSuiteDashboard() {
   const { toast } = useToast()
   const [testSuites, setTestSuites] = useState<TestSuite[]>([])
   const [testResults, setTestResults] = useState<TestResult[]>([])
+  const [coverageData, setCoverageData] = useState<{name: string, value: number, color: string}[]>([])
+  const [testTrends, setTestTrends] = useState<{date: string, passed: number, failed: number, coverage: number}[]>([])
   const [selectedSuite, setSelectedSuite] = useState<TestSuite | null>(null)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
@@ -186,8 +188,31 @@ export function TestingSuiteDashboard() {
         },
       ]
 
+      // Mock data for coverage chart
+      const mockCoverageData = [
+        { name: 'Lines', value: 88, color: '#22c55e' },
+        { name: 'Functions', value: 92, color: '#3b82f6' },
+        { name: 'Branches', value: 85, color: '#f59e0b' },
+        { name: 'Statements', value: 90, color: '#ef4444' }
+      ]
+
+      // Mock data for testing trends
+      const mockTestTrends = [
+        { date: '2024-01-20', passed: 145, failed: 8, coverage: 85 },
+        { date: '2024-01-21', passed: 152, failed: 6, coverage: 87 },
+        { date: '2024-01-22', passed: 148, failed: 9, coverage: 86 },
+        { date: '2024-01-23', passed: 156, failed: 4, coverage: 89 },
+        { date: '2024-01-24', passed: 159, failed: 3, coverage: 90 },
+        { date: '2024-01-25', passed: 162, failed: 2, coverage: 92 },
+        { date: '2024-01-26', passed: 158, failed: 5, coverage: 91 },
+        { date: '2024-01-27', passed: 164, failed: 1, coverage: 93 },
+        { date: '2024-01-28', passed: 167, failed: 2, coverage: 92 }
+      ]
+
       setTestSuites(mockTestSuites)
       setTestResults(mockTestResults)
+      setCoverageData(mockCoverageData)
+      setTestTrends(mockTestTrends)
     } catch (error) {
       console.error('Error fetching test data:', error)
       toast({

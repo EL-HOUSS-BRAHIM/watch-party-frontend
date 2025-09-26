@@ -375,9 +375,9 @@ export default function VideosPage() {
         )}
 
         {/* Pagination would go here if needed */}
-        {videos?.results?.length > 0 && (
+        {videos?.results && videos.results.length > 0 && (
           <div className="mt-8 text-center text-muted-foreground">
-            Showing {videos.results.length} of {videos.count || videos.results.length} videos
+            Showing {videos.results.length} of {videos?.count || videos.results.length} videos
           </div>
         )}
       </div>

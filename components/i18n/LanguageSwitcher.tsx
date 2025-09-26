@@ -156,10 +156,10 @@ export default function LanguageSwitcher({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <Languages className="w-5 h-5 text-muted-foreground" />
-            <h3 className="font-medium">{t('language.title', 'Language')}</h3>
+            <h3 className="font-medium">{t('language.title')}</h3>
           </div>
           <Badge variant="outline" className="text-xs">
-            {languages.length} {t('language.available', 'available')}
+            {languages.length} {t('language.available')}
           </Badge>
         </div>
 
@@ -174,7 +174,7 @@ export default function LanguageSwitcher({
             </div>
             <div className="flex items-center space-x-2">
               <Badge variant="outline" className="text-blue-600 border-blue-200">
-                {t('language.current', 'Current')}
+                {t('language.current')}
               </Badge>
               <Check className="w-4 h-4 text-green-500" />
             </div>
@@ -183,7 +183,7 @@ export default function LanguageSwitcher({
           <details className="group">
             <summary className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
               <span className="font-medium">
-                {t('language.change', 'Change Language')}
+                {t('language.change')}
               </span>
               <ChevronDown className="w-4 h-4 transform group-open:rotate-180 transition-transform" />
             </summary>
@@ -232,16 +232,16 @@ export default function LanguageSwitcher({
               <div className="flex items-center space-x-2">
                 <MapPin className="w-4 h-4 text-yellow-600" />
                 <span className="text-sm text-yellow-800 dark:text-yellow-200">
-                  {t('language.rtl_notice', 'Right-to-left text direction is active')}
+                  {t('language.rtl_notice')}
                 </span>
               </div>
             </div>
           )}
 
           <div className="text-xs text-muted-foreground">
-            {t('language.help', 'Help us translate Watch Party into more languages.')} {' '}
+            {t('language.help')} {' '}
             <button className="text-blue-600 hover:underline">
-              {t('language.contribute', 'Contribute translations')}
+              {t('language.contribute')}
             </button>
           </div>
         </div>

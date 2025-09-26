@@ -7,6 +7,7 @@ import { translations, type AllTranslationKeys } from "@/lib/i18n/translations"
 
 interface I18nContextType {
   language: string
+  currentLanguage: string  // Added alias for backward compatibility
   setLanguage: (lang: string) => void
   t: (key: AllTranslationKeys, params?: Record<string, any>) => string
   availableLanguages: Array<{
@@ -80,6 +81,6 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   return (
-    <I18nContext.Provider value={{ language, setLanguage, t, availableLanguages }}>{children}</I18nContext.Provider>
+    <I18nContext.Provider value={{ language, currentLanguage: language, setLanguage, t, availableLanguages }}>{children}</I18nContext.Provider>
   )
 }
