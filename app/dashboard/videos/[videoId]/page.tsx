@@ -561,8 +561,8 @@ export default function VideoDetailsPage() {
                       <Avatar className="w-8 h-8">
                         <AvatarImage src={user?.avatar || "/placeholder.svg"} />
                         <AvatarFallback>
-                          {user?.firstName?.[0]}
-                          {user?.lastName?.[0]}
+                          {user?.first_name?.[0]}
+                          {user?.last_name?.[0]}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 space-y-2">

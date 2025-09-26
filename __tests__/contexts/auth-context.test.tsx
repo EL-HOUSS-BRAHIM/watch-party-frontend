@@ -6,13 +6,13 @@ import type { ReactNode } from "react"
 
 // Test component to use the auth context
 function TestComponent() {
-  const { user, login, logout, loading } = useAuth()
+  const { user, login, logout, isLoading } = useAuth()
 
   return (
     <div>
       <div data-testid="user">{user ? user.email : "No user"}</div>
-      <div data-testid="loading">{loading ? "Loading" : "Not loading"}</div>
-      <button onClick={() => login({ email: "test@example.com", password: "password" })}>Login</button>
+      <div data-testid="loading">{isLoading ? "Loading" : "Not loading"}</div>
+      <button onClick={() => login("test@example.com", "password")}>Login</button>
       <button onClick={logout}>Logout</button>
     </div>
   )
@@ -27,7 +27,7 @@ describe("AuthContext", () => {
     renderWithProvider(<TestComponent />)
 
     expect(screen.getByTestId("user")).toHaveTextContent("No user")
-    expect(screen.getByTestId("loading")).toHaveTextContent("Not loading")
+  expect(screen.getByTestId("loading")).toHaveTextContent("Not loading")
   })
 
   it("handles login flow", async () => {

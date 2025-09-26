@@ -11,7 +11,7 @@ interface ProtectedRouteProps {
   children: React.ReactNode
   requireAuth?: boolean
   requireAdmin?: boolean
-  fallback?: React.ReactNode
+  fallback?: React.ReactElement | null
   redirectTo?: string
 }
 
@@ -21,13 +21,13 @@ export function ProtectedRoute({
   requireAdmin = false,
   fallback,
   redirectTo,
-}: ProtectedRouteProps) {
-  const { user, loading, isAuthenticated, isAdmin } = useAuth()
+}: ProtectedRouteProps): React.ReactElement | null {
+  const { user, isLoading, isAuthenticated, isAdmin } = useAuth()
   const router = useRouter()
   const [shouldRender, setShouldRender] = useState(false)
 
   useEffect(() => {
-    if (loading) return
+    if (isLoading) return
 
     // If authentication is required but user is not authenticated
     if (requireAuth && !isAuthenticated) {
@@ -49,10 +49,10 @@ export function ProtectedRoute({
     }
 
     setShouldRender(true)
-  }, [loading, isAuthenticated, isAdmin, requireAuth, requireAdmin, router, redirectTo])
+  }, [isLoading, isAuthenticated, isAdmin, requireAuth, requireAdmin, router, redirectTo])
 
   // Show loading state
-  if (loading) {
+  if (isLoading) {
     return (
       fallback || (
         <div className="min-h-screen flex items-center justify-center">
@@ -92,11 +92,11 @@ export function withAuth<P extends object>(
 
 // Hook for checking auth status in components
 export function useRequireAuth(requireAdmin = false) {
-  const { isAuthenticated, isAdmin, loading } = useAuth()
+  const { isAuthenticated, isAdmin, isLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (loading) return
+    if (isLoading) return
 
     if (!isAuthenticated) {
       router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)
@@ -107,12 +107,12 @@ export function useRequireAuth(requireAdmin = false) {
       router.push("/dashboard")
       return
     }
-  }, [isAuthenticated, isAdmin, loading, requireAdmin, router])
+  }, [isAuthenticated, isAdmin, isLoading, requireAdmin, router])
 
   return {
     isAuthenticated,
     isAdmin,
-    loading,
+    loading: isLoading,
     canAccess: isAuthenticated && (!requireAdmin || isAdmin),
   }
 }

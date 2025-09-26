@@ -1,4 +1,15 @@
-// Re-export auth types from the main API types
+import type {
+  AuthResponse,
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
+  LoginCredentials,
+  RegisterData,
+  ResetPasswordRequest,
+  User,
+  UserProfile,
+} from "@/lib/api/types"
+
+// Re-export auth types for convenience
 export type {
   User,
   AuthResponse,
@@ -10,11 +21,13 @@ export type {
   UserProfile,
 } from "@/lib/api/types"
 
-// Additional auth-specific types can be added here
 export interface AuthContextType {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
+  isAdmin: boolean
+  accessToken: string | null
+  refreshToken: string | null
   login: (email: string, password: string) => Promise<void>
   register: (userData: RegisterData) => Promise<void>
   logout: () => Promise<void>
@@ -23,6 +36,8 @@ export interface AuthContextType {
   verifyEmail: (token: string) => Promise<void>
   resendVerification: () => Promise<void>
   socialLogin: (provider: "google" | "github") => Promise<void>
-  refreshToken: () => Promise<void>
+  refreshTokens: () => Promise<void>
   updateProfile: (data: Partial<User>) => Promise<void>
+  updateUser: (data: Partial<User>) => void
+  refreshUser: () => Promise<void>
 }

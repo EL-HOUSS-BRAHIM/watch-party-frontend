@@ -388,8 +388,8 @@ export default function WatchRoomPage() {
       user: {
         id: user.id,
         username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        firstName: user.first_name,
+        lastName: user.last_name,
         avatar: user.avatar,
       },
       message: newMessage.trim(),

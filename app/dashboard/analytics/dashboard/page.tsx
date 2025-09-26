@@ -86,7 +86,9 @@ export default function AdminAnalyticsDashboard() {
       ]);
 
       // Transform API data to component format
-      const transformedMetrics: AdminMetrics = {
+  const performanceSource = (advancedData as any).performance || (dashboardData as any).performance || {}
+
+  const transformedMetrics: AdminMetrics = {
         overview: {
           totalUsers: dashboardData.overview?.total_users || 0,
           activeUsers: dashboardData.overview?.active_users_today || 0,
@@ -110,9 +112,9 @@ export default function AdminAnalyticsDashboard() {
           subscriptionTiers: (dashboardData as any).demographics?.subscription_tiers || (advancedData as any).demographics?.subscription_tiers || [],
         },
         performance: {
-          serverMetrics: realtimeData.performance?.server_metrics || (advancedData as any).performance?.server_metrics || [],
-          errorRates: (advancedData as any).performance?.error_rates || realtimeData.performance?.error_rates || [],
-          loadTimes: (dashboardData as any).performance?.load_times || (advancedData as any).performance?.load_times || [],
+          serverMetrics: performanceSource.server_metrics || [],
+          errorRates: performanceSource.error_rates || [],
+          loadTimes: performanceSource.load_times || [],
         },
         retention: {
           cohorts: (dashboardData as any).retention?.cohorts || (advancedData as any).retention?.cohorts || [],

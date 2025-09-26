@@ -21,7 +21,7 @@ jest.mock('@/hooks/use-toast', () => ({
   useToast: (...args: unknown[]) => useToastMock(...args),
 }))
 
-const SmartFriendSearch = require('@/components/social/smart-friend-search').default as typeof import('@/components/social/smart-friend-search').default
+import SmartFriendSearch from '@/components/social/smart-friend-search'
 
 const mockSearchResponse = {
   results: [

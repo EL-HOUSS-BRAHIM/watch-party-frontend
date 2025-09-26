@@ -6,43 +6,27 @@ import { AuthAPI } from "@/lib/api/auth"
 import { UsersAPI } from "@/lib/api/users"
 import type { User as APIUser, RegisterData as APIRegisterData } from "@/lib/api/types"
 import { tokenStorage } from "@/lib/auth/token-storage"
+import type { AuthContextType } from "@/types/auth"
 
 // Initialize API instances directly
 const authAPI = new AuthAPI()
 const usersAPI = new UsersAPI()
 
-// Extended user interface for the frontend context  
-interface User extends Omit<APIUser, 'avatar'> {
-  avatar?: string | null // Allow both null and undefined for compatibility
-  role?: "user" | "admin" | "moderator"
-  isEmailVerified?: boolean
-}
-
-interface AuthContextType {
-  user: User | null
-  isLoading: boolean
-  isAuthenticated: boolean
-  accessToken: string | null
-  refreshToken: string | null
-  login: (email: string, password: string) => Promise<void>
-  register: (userData: RegisterData) => Promise<void>
-  logout: () => void
-  forgotPassword: (email: string) => Promise<void>
-  resetPassword: (token: string, password: string) => Promise<void>
-  verifyEmail: (token: string) => Promise<void>
-  resendVerification: () => Promise<void>
-  socialLogin: (provider: "google" | "github") => Promise<void>
-  refreshTokens: () => Promise<void>
-  updateProfile: (data: Partial<User>) => Promise<void>
-  updateUser: (userData: Partial<User>) => void
-  refreshUser: () => Promise<void>
-}
-
-interface RegisterData extends APIRegisterData {
-  // Keep the same structure as API but allow for frontend-specific extensions
-}
+type User = APIUser
+type RegisterData = APIRegisterData
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+const normalizeUser = (data: APIUser | null): User | null => {
+  if (!data) {
+    return null
+  }
+
+  return {
+    ...data,
+    avatar: data.avatar ?? undefined,
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -54,6 +38,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = useMemo(() => {
     return !!user && !!accessToken
   }, [user, accessToken])
+
+  const isAdmin = useMemo(() => {
+    if (!user) return false
+    return user.role === "admin" || user.isSuperuser === true || user.isStaff === true
+  }, [user])
 
   // Keep local state in sync with storage updates
   useEffect(() => {
@@ -67,7 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(tokenStorage.getAccessToken())
     setRefreshToken(tokenStorage.getRefreshToken())
 
-    return unsubscribe
+    return () => {
+      unsubscribe()
+    }
   }, [])
 
   // Check for existing session on mount
@@ -105,8 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const userData = await authAPI.getProfile()
-      setUser({ ...userData, avatar: userData.avatar || undefined })
+  const userData = await authAPI.getProfile()
+  setUser(normalizeUser(userData))
     } catch (error) {
       console.error("Auth check failed:", error)
       tokenStorage.clearTokens()
@@ -127,15 +118,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshToken: response.refresh_token,
       })
 
-      const user = {
-        ...response.user,
-        avatar: response.user.avatar || undefined,
-        role: response.user.role,
-      }
-      setUser(user)
+      const normalizedUser = normalizeUser(response.user)
+      setUser(normalizedUser)
 
       // Redirect based on user role
-      if (user.role === "admin") {
+      if (normalizedUser?.role === "admin") {
         router.push("/dashboard/admin")
       } else {
         router.push("/dashboard")
@@ -156,11 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           accessToken: response.access_token,
           refreshToken: response.refresh_token,
         })
-        setUser({
-          ...response.user,
-          avatar: response.user.avatar || undefined,
-          role: response.user.role,
-        })
+        setUser(normalizeUser(response.user))
         router.push("/dashboard")
       } else {
         // Email verification required
@@ -259,12 +242,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("No refresh token available")
       }
 
-      const response = await authAPI.refreshToken()
-      tokenStorage.setTokens({ accessToken: response.access, refreshToken: currentRefreshToken })
+  const response = await authAPI.refreshToken()
+  tokenStorage.setTokens({ accessToken: response.access, refreshToken: currentRefreshToken })
 
-      // Get updated user data
-      const userData = await authAPI.getProfile()
-      setUser({ ...userData, avatar: userData.avatar || undefined })
+  // Get updated user data
+  const userData = await authAPI.getProfile()
+  setUser(normalizeUser(userData))
     } catch (error) {
       tokenStorage.clearTokens()
       setAccessToken(null)
@@ -285,18 +268,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       const response = await usersAPI.updateProfile(profileData)
-      setUser({ 
-        ...response, 
-        ...response.profile,
-        avatar: response.avatar || undefined 
-      })
+      const { profile, ...userData } = response
+      setUser(normalizeUser(userData))
     } catch (error) {
       throw error
     }
   }
 
   const updateUser = (userData: Partial<User>) => {
-    setUser(prev => prev ? { ...prev, ...userData } : null)
+    setUser((prev) => {
+      if (!prev) {
+        return null
+      }
+
+      const next: User = {
+        ...prev,
+        ...userData,
+      }
+
+      if ("avatar" in next) {
+        next.avatar = next.avatar ?? undefined
+      }
+
+      return next
+    })
   }
 
   const refreshUser = async () => {
@@ -304,7 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true)
       if (tokenStorage.hasAccessToken()) {
         const userData = await authAPI.getProfile()
-        setUser(userData)
+        setUser(normalizeUser(userData))
       }
     } catch (error) {
       console.error("Failed to refresh user:", error)
@@ -317,6 +312,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     isLoading,
     isAuthenticated,
+    isAdmin,
     login,
     register,
     logout,

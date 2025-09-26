@@ -17,7 +17,7 @@ import WatchPartyTable from "@/components/ui/watch-party-table"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { adminAPI } from "@/lib/api"
-import type { User } from "@/lib/api/types"
+import type { RawUser, User } from "@/lib/api/types"
 import {
   Users,
   Search,
@@ -132,28 +132,36 @@ export default function UserManagementPage() {
       })
       
       // Transform User data to AdminUser format
-      const transformedUsers: AdminUser[] = (data.results || []).map((user: User) => ({
-        id: user.id,
-        username: user.email.split('@')[0], // Derive username from email
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        avatar: user.avatar ?? undefined,
-        isVerified: user.isVerified ?? false,
-        isPremium: user.is_premium,
-        isActive: true, // Default to active
-        isBanned: false, // Default to not banned
-        role: user.is_staff ? "admin" : "user" as const,
-        joinedAt: user.date_joined,
-        lastActive: user.last_login ?? undefined,
-        stats: {
-          partiesHosted: Math.floor(Math.random() * 50),
-          partiesJoined: Math.floor(Math.random() * 200),
-          videosUploaded: Math.floor(Math.random() * 25),
-          totalWatchTime: Math.floor(Math.random() * 10000),
-          friendsCount: Math.floor(Math.random() * 100)
+      const transformedUsers: AdminUser[] = (data.results ?? []).map((user) => {
+        const rawUser = user as User & Partial<RawUser>
+        const email = rawUser.email ?? ""
+        const firstName = rawUser.firstName ?? rawUser.first_name ?? rawUser.displayName ?? rawUser.display_name ?? rawUser.username
+        const lastName = rawUser.lastName ?? rawUser.last_name ?? ""
+        const status = rawUser.status ?? "active"
+
+        return {
+          id: rawUser.id,
+          username: rawUser.username,
+          email,
+          firstName,
+          lastName,
+          avatar: rawUser.avatar ?? undefined,
+          isVerified: rawUser.isVerified ?? rawUser.is_verified ?? false,
+          isPremium: rawUser.isPremium ?? rawUser.is_premium ?? false,
+          isActive: status !== "inactive" && status !== "banned",
+          isBanned: status === "banned",
+          role: rawUser.isStaff || rawUser.is_staff ? "admin" : rawUser.role === "moderator" ? "moderator" : "user",
+          joinedAt: rawUser.dateJoined ?? rawUser.date_joined ?? new Date().toISOString(),
+          lastActive: rawUser.lastActive ?? rawUser.last_active ?? rawUser.lastLogin ?? rawUser.last_login ?? undefined,
+          stats: {
+            partiesHosted: Math.floor(Math.random() * 50),
+            partiesJoined: Math.floor(Math.random() * 200),
+            videosUploaded: Math.floor(Math.random() * 25),
+            totalWatchTime: Math.floor(Math.random() * 10000),
+            friendsCount: Math.floor(Math.random() * 100),
+          },
         }
-      }))
+      })
       
       setUsers(transformedUsers)
       // setStats would need to be extracted from the response or fetched separately

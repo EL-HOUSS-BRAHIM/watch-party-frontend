@@ -1,7 +1,8 @@
-"use client"
-
 import { jest } from "@jest/globals"
 import "@testing-library/jest-dom"
+
+// Make jest functions globally available
+Object.assign(global, { jest })
 
 // Mock Next.js router
 jest.mock("next/navigation", () => ({

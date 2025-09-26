@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { OnlineStatusIndicators } from '@/components/social/online-status-indicators'
+import OnlineStatusIndicators from '@/components/social/online-status-indicators'
 import { usersAPI } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 

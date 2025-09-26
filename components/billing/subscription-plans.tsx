@@ -60,7 +60,7 @@ export default function SubscriptionPlans({ className }: SubscriptionPlansProps)
         storage: "1GB",
         videoQuality: "720p",
       },
-      current: user?.subscription?.plan === "free",
+      current: user?.is_premium === false,
     },
     {
       id: "premium",
@@ -84,7 +84,7 @@ export default function SubscriptionPlans({ className }: SubscriptionPlansProps)
         videoQuality: "1080p",
       },
       popular: true,
-      current: user?.subscription?.plan === "premium",
+      current: user?.is_premium === true,
     },
     {
       id: "pro",
@@ -108,7 +108,7 @@ export default function SubscriptionPlans({ className }: SubscriptionPlansProps)
         storage: "500GB",
         videoQuality: "4K",
       },
-      current: user?.subscription?.plan === "pro",
+      current: user?.is_premium === true, // Assuming pro is also premium
     },
   ]
 

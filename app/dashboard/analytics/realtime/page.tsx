@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
 import { analyticsAPI } from "@/lib/api"
 import { Progress } from '@/components/ui/progress';
 import { 
@@ -20,35 +19,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, AreaChart, Area } from 'recharts';
-
-interface RealtimeStats {
-  currentUsers: number;
-  activeParties: number;
-  watchingNow: number;
-  messagesPerMinute: number;
-  serverLoad: number;
-  bandwidth: number;
-  uptime: string;
-  regions: Array<{
-    name: string;
-    users: number;
-    latency: number;
-  }>;
-  devices: {
-    desktop: number;
-    mobile: number;
-    tablet: number;
-  };
-  activityData: Array<{
-    time: string;
-    users: number;
-    parties: number;
-    messages: number;
-  }>;
-}
+import type { AnalyticsRealtimeSnapshot } from "@/lib/api/types"
 
 export default function RealtimeAnalytics() {
-  const [stats, setStats] = useState<RealtimeStats | null>(null);
+  const [snapshot, setSnapshot] = useState<AnalyticsRealtimeSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
@@ -56,8 +30,8 @@ export default function RealtimeAnalytics() {
     const fetchRealtimeStats = async () => {
       try {
         // Real API call for realtime analytics
-        const realtimeData = await analyticsAPI.getRealtimeAnalytics();
-        setStats(realtimeData);
+  const realtimeData = await analyticsAPI.getRealtimeAnalytics();
+  setSnapshot(realtimeData);
         setLoading(false);
       } catch (error) {
         console.error('Failed to fetch realtime stats:', error);
@@ -88,9 +62,42 @@ export default function RealtimeAnalytics() {
     );
   }
 
-  if (!stats) return null;
+  if (!snapshot) return null;
 
-  const totalDevices = stats.devices.desktop + stats.devices.mobile + stats.devices.tablet;
+  const activeUsers = snapshot.active_users;
+  const concurrentStreams = snapshot.concurrent_streams;
+  const activeParties = snapshot.active_parties ?? concurrentStreams;
+  const watchingNow = concurrentStreams;
+  const messagesPerMinute = snapshot.messages_per_minute;
+  const bandwidthUsage = snapshot.bandwidth_usage;
+  const deviceBreakdown = snapshot.device_breakdown ?? [];
+  const geoDistribution = snapshot.geo_distribution ?? [];
+  const timeSeries = snapshot.time_series ?? [];
+
+  const estimatedServerLoad = Math.min(100, Math.round((concurrentStreams / Math.max(activeUsers, 1)) * 100));
+  const bandwidthPercent = Math.min(100, Math.round((bandwidthUsage ?? 0) * 10));
+  const lastUpdate = timeSeries.at(-1)?.timestamp ?? null;
+  const uptimeDisplay = lastUpdate ? new Date(lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A";
+
+  const deviceStats = deviceBreakdown.map((entry) => ({
+    device: entry.device,
+    percentage: entry.percentage,
+    count: Math.round(((entry.percentage ?? 0) / 100) * activeUsers),
+  }));
+
+  const totalRegionUsers = geoDistribution.reduce((sum, entry) => sum + entry.users, 0) || 1;
+  const regionStats = geoDistribution.map((entry) => ({
+    country: entry.country,
+    users: entry.users,
+    percentage: Math.round((entry.users / totalRegionUsers) * 100),
+  }));
+
+  const activityData = timeSeries.map((point) => ({
+    time: new Date(point.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    users: point.active_users,
+    streams: point.concurrent_streams,
+    messages: point.messages_per_minute,
+  }));
 
   return (
     <div className="p-6 space-y-6">
@@ -123,7 +130,7 @@ export default function RealtimeAnalytics() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Active Users</p>
-                <p className="text-3xl font-bold text-blue-600">{stats.currentUsers.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-blue-600">{activeUsers.toLocaleString()}</p>
               </div>
               <Users className="w-8 h-8 text-blue-600" />
             </div>
@@ -139,7 +146,7 @@ export default function RealtimeAnalytics() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Active Parties</p>
-                <p className="text-3xl font-bold text-purple-600">{stats.activeParties}</p>
+                <p className="text-3xl font-bold text-purple-600">{activeParties}</p>
               </div>
               <Video className="w-8 h-8 text-purple-600" />
             </div>
@@ -155,7 +162,7 @@ export default function RealtimeAnalytics() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Watching Now</p>
-                <p className="text-3xl font-bold text-green-600">{stats.watchingNow.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-green-600">{watchingNow.toLocaleString()}</p>
               </div>
               <Eye className="w-8 h-8 text-green-600" />
             </div>
@@ -171,7 +178,7 @@ export default function RealtimeAnalytics() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Messages/Min</p>
-                <p className="text-3xl font-bold text-orange-600">{stats.messagesPerMinute}</p>
+                <p className="text-3xl font-bold text-orange-600">{messagesPerMinute}</p>
               </div>
               <MessageSquare className="w-8 h-8 text-orange-600" />
             </div>
@@ -193,24 +200,24 @@ export default function RealtimeAnalytics() {
             <div>
               <div className="flex justify-between text-sm mb-2">
                 <span>Server Load</span>
-                <span>{stats.serverLoad}%</span>
+                <span>{estimatedServerLoad}%</span>
               </div>
-              <Progress value={stats.serverLoad} className="h-2" />
+              <Progress value={estimatedServerLoad} className="h-2" />
             </div>
             
             <div>
               <div className="flex justify-between text-sm mb-2">
                 <span>Bandwidth Usage</span>
-                <span>{stats.bandwidth} GB/s</span>
+                <span>{bandwidthUsage.toFixed(2)} Gb/s</span>
               </div>
-              <Progress value={(stats.bandwidth / 10) * 100} className="h-2" />
+              <Progress value={bandwidthPercent} className="h-2" />
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t">
               <span className="text-sm text-muted-foreground">Uptime</span>
               <div className="flex items-center">
                 <Clock className="w-4 h-4 mr-2 text-green-500" />
-                <span className="font-medium">{stats.uptime}</span>
+                <span className="font-medium">Updated {uptimeDisplay}</span>
               </div>
             </div>
           </CardContent>
@@ -222,15 +229,15 @@ export default function RealtimeAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {stats.regions.map((region) => (
-                <div key={region.name} className="flex items-center justify-between">
+              {regionStats.map((region) => (
+                <div key={region.country} className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Globe className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{region.name}</span>
+                    <span className="text-sm">{region.country}</span>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-medium">{region.users} users</div>
-                    <div className="text-xs text-muted-foreground">{region.latency}ms</div>
+                    <div className="text-sm font-medium">{region.users.toLocaleString()} users</div>
+                    <div className="text-xs text-muted-foreground">{region.percentage}% of active users</div>
                   </div>
                 </div>
               ))}
@@ -244,44 +251,22 @@ export default function RealtimeAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Monitor className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm">Desktop</span>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium">{stats.devices.desktop}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {Math.round((stats.devices.desktop / totalDevices) * 100)}%
+              {deviceStats.map((device) => (
+                <div key={device.device} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    {device.device === "mobile" ? (
+                      <Smartphone className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <Monitor className="w-4 h-4 text-blue-500" />
+                    )}
+                    <span className="text-sm capitalize">{device.device}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium">{device.count.toLocaleString()}</div>
+                    <div className="text-xs text-muted-foreground">{Math.round(device.percentage)}%</div>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Smartphone className="w-4 h-4 text-green-500" />
-                  <span className="text-sm">Mobile</span>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium">{stats.devices.mobile}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {Math.round((stats.devices.mobile / totalDevices) * 100)}%
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Monitor className="w-4 h-4 text-purple-500" />
-                  <span className="text-sm">Tablet</span>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium">{stats.devices.tablet}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {Math.round((stats.devices.tablet / totalDevices) * 100)}%
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
           </CardContent>
         </Card>

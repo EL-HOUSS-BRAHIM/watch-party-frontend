@@ -1,15 +1,17 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { jest } from "@jest/globals"
+import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 
-const mockLogin = jest.fn()
-const mockSocialLogin = jest.fn()
+import LoginPage from "@/app/(auth)/login/page"
+
+type SocialProvider = "google" | "github"
+
+const mockLogin = jest.fn(async (_email: string, _password: string) => {})
+const mockSocialLogin = jest.fn(async (_provider: SocialProvider) => {})
 const mockToast = jest.fn()
 const useAuthMock = jest.fn()
 const useToastMock = jest.fn()
 const useRouterMock = jest.fn()
 const useSearchParamsMock = jest.fn()
-
-const LoginPage = require("@/app/(auth)/login/page").default as typeof import("@/app/(auth)/login/page").default
 
 const createSearchParams = (params: Record<string, string> = {}) => ({
   get: (key: string) => params[key] ?? null,

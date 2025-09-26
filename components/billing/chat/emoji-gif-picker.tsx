@@ -16,7 +16,7 @@ import {
   Heart,
   Laugh,
   ThumbsUp,
-  Fire
+  Flame
 } from 'lucide-react'
 
 interface EmojiGifPickerProps {
