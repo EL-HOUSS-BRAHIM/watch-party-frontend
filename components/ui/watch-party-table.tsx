@@ -423,7 +423,7 @@ export function WatchPartyTable<T = any>({
                   onClick={() => toggleColumnVisibility(column.id)}
                   className="flex items-center gap-2"
                 >
-                  <Checkbox checked={!hiddenColumns.has(column.id) && !column.hidden} readOnly />
+                  <Checkbox checked={!hiddenColumns.has(column.id) && !column.hidden} />
                   {typeof column.header === "string" ? column.header : column.id}
                 </DropdownMenuItem>
               ))}
@@ -460,10 +460,6 @@ export function WatchPartyTable<T = any>({
                     <Checkbox
                       checked={
                         paginatedData.length > 0 && paginatedData.every((row, index) => isRowSelected(row, index))
-                      }
-                      indeterminate={
-                        paginatedData.some((row, index) => isRowSelected(row, index)) &&
-                        !paginatedData.every((row, index) => isRowSelected(row, index))
                       }
                       onChange={toggleAllSelection}
                     />

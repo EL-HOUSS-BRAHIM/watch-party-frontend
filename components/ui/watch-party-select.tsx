@@ -58,7 +58,7 @@ const WatchPartySelect = React.forwardRef<HTMLButtonElement, WatchPartySelectPro
         return Array.isArray(value) ? value : []
       }
       return value ? [value] : []
-    }, [value, multiple])
+    }, [value, multiple]) as string[]
 
     const filteredOptions = React.useMemo(() => {
       if (!searchValue) return options
