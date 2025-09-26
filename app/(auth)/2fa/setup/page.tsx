@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,22 +43,7 @@ export default function TwoFactorSetupPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isGeneratingQR, setIsGeneratingQR] = useState(false)
 
-  useEffect(() => {
-    if (!user) {
-      router.push("/login")
-      return
-    }
-
-    // Check if 2FA is already enabled
-    if (user.twoFactorEnabled) {
-      router.push("/dashboard/settings")
-      return
-    }
-
-    generateQRCode()
-  }, [user, router])
-
-  const generateQRCode = async () => {
+  const generateQRCode = useCallback(async () => {
     setIsGeneratingQR(true)
     try {
       const data = await authService.setup2FA()
@@ -97,7 +83,22 @@ export default function TwoFactorSetupPage() {
     } finally {
       setIsGeneratingQR(false)
     }
-  }
+  }, [authService, user, toast])
+
+  useEffect(() => {
+    if (!user) {
+      router.push("/login")
+      return
+    }
+
+    // Check if 2FA is already enabled
+    if (user.twoFactorEnabled) {
+      router.push("/dashboard/settings")
+      return
+    }
+
+    generateQRCode()
+  }, [user, router, generateQRCode])
 
   const copySecretKey = async () => {
     try {
@@ -144,9 +145,13 @@ export default function TwoFactorSetupPage() {
         title: "2FA Enabled!",
         description: "Two-factor authentication has been successfully enabled.",
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("2FA verification error:", error)
-      const message = error?.response?.data?.message || error?.message || "Verification failed. Please try again."
+      const message = error instanceof Error 
+        ? error.message 
+        : (error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message 
+          || (error as { message?: string })?.message 
+          || "Verification failed. Please try again."
       setErrors({ code: message })
     } finally {
       setIsLoading(false)
@@ -260,7 +265,7 @@ export default function TwoFactorSetupPage() {
                   {/* QR Code */}
                   <div className="bg-white p-4 rounded-xl mx-auto w-fit">
                     {qrCodeUrl ? (
-                      <img src={qrCodeUrl || "/placeholder.svg"} alt="2FA QR Code" className="w-48 h-48" />
+                      <Image src={qrCodeUrl || "/placeholder.svg"} alt="2FA QR Code" className="w-48 h-48" width={192} height={192} />
                     ) : (
                       <div className="w-48 h-48 bg-gray-200 rounded-lg flex items-center justify-center">
                         <QrCode className="w-12 h-12 text-gray-400" />
@@ -282,7 +287,7 @@ export default function TwoFactorSetupPage() {
                       </Button>
                     </div>
                     <code className="text-xs text-gray-300 break-all bg-black/20 p-2 rounded block">{secretKey}</code>
-                    <p className="text-xs text-gray-500 mt-2">Use this key if you can't scan the QR code</p>
+                    <p className="text-xs text-gray-500 mt-2">Use this key if you can&apos;t scan the QR code</p>
                   </div>
 
                   <div className="flex space-x-3">
@@ -442,7 +447,7 @@ export default function TwoFactorSetupPage() {
                 </h4>
                 <ul className="space-y-1 text-sm text-gray-400">
                   <li>• Store backup codes in a secure password manager</li>
-                  <li>• Don't share these codes with anyone</li>
+                  <li>• Don&apos;t share these codes with anyone</li>
                   <li>• Each code can only be used once</li>
                   <li>• Generate new codes if these are compromised</li>
                 </ul>

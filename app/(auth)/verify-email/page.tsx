@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, Suspense, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -31,7 +31,7 @@ function EmailVerificationHandler() {
     }
 
     verifyEmail()
-  }, [token, email])
+  }, [token, email, verifyEmail])
 
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -44,7 +44,7 @@ function EmailVerificationHandler() {
     }
   }, [resendCooldown])
 
-  const verifyEmail = async () => {
+  const verifyEmail = useCallback(async () => {
     setStatus("loading")
 
     try {
@@ -88,7 +88,7 @@ function EmailVerificationHandler() {
       setStatus("error")
       setMessage("An unexpected error occurred. Please try again.")
     }
-  }
+  }, [token, email, toast, router])
 
   const resendVerificationEmail = async () => {
     setIsResending(true)

@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -26,7 +26,6 @@ import {
 } from "lucide-react"
 
 export default function LoginPage() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const { login, socialLogin, isLoading } = useAuth()
   const { toast } = useToast()
@@ -83,11 +82,11 @@ export default function LoginPage() {
       await login(formData.email, formData.password)
       toast({
         title: "Welcome back!",
-        description: "You've been successfully logged in.",
+        description: "You&apos;ve been successfully logged in.",
         duration: 3000,
       })
-    } catch (error: any) {
-      const errorMessage = error?.message || "Login failed. Please try again."
+    } catch (error: unknown) {
+      const errorMessage = (error as { message?: string })?.message || "Login failed. Please try again."
       setErrors({ general: errorMessage })
       toast({
         title: "Login Failed",
@@ -102,10 +101,10 @@ export default function LoginPage() {
   const handleSocialLogin = async (provider: "google" | "github") => {
     try {
       await socialLogin(provider)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Social Login Failed",
-        description: error?.message || `Failed to login with ${provider}`,
+        description: (error as { message?: string })?.message || `Failed to login with ${provider}`,
         variant: "destructive",
       })
     }
@@ -301,7 +300,7 @@ export default function LoginPage() {
       {/* Register Link */}
       <div className="text-center">
         <p className="text-gray-400">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link href="/register" className="text-neon-blue hover:text-neon-purple font-medium transition-colors">
             Create one now
           </Link>

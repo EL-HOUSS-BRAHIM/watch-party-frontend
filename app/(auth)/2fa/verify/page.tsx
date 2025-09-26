@@ -164,9 +164,9 @@ function TwoFactorVerifyForm() {
 
       const redirectTo = searchParams.get("redirect") || "/dashboard"
       router.push(redirectTo)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("2FA verification error:", error)
-      const data = error?.response?.data
+      const data = (error as { response?: { data?: { attempts_remaining?: number; account_locked?: boolean; message?: string } } })?.response?.data
 
       if (typeof data?.attempts_remaining === "number") {
         setAttemptsRemaining(data.attempts_remaining)
@@ -403,10 +403,10 @@ function TwoFactorVerifyForm() {
                 <div className="space-y-2">
                   <h4 className="text-white font-medium text-sm">Need Help?</h4>
                   <ul className="space-y-1 text-xs text-gray-400">
-                    <li>• Make sure your device's time is synchronized</li>
+                    <li>• Make sure your device&apos;s time is synchronized</li>
                     <li>• Check if your authenticator app is up to date</li>
-                    <li>• Use backup codes if you can't access your phone</li>
-                    <li>• Contact support if you're still having issues</li>
+                    <li>• Use backup codes if you can&apos;t access your phone</li>
+                    <li>• Contact support if you&apos;re still having issues</li>
                   </ul>
                 </div>
               </div>
