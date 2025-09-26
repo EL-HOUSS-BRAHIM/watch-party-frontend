@@ -18,7 +18,9 @@ class MemoryCache {
   set(key: string, data: any, ttl = 5 * 60 * 1000) {
     if (this.cache.size >= this.maxSize) {
       const firstKey = this.cache.keys().next().value
-      this.cache.delete(firstKey)
+      if (firstKey) {
+        this.cache.delete(firstKey)
+      }
     }
 
     this.cache.set(key, {

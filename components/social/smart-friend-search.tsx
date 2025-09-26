@@ -93,37 +93,37 @@ const normalizeSearchUser = (user: any): User => ({
 });
 
 const buildSearchParams = (searchTerm: string, filters: SearchFilters) => {
-  const params: Record<string, any> = {
-    q: searchTerm,
+  const result = {
+    q: searchTerm || '',
     limit: 20,
     sort: filters.sortBy,
-  };
+  } as any;
 
   if (filters.location !== 'any') {
-    params.location = filters.location;
+    result.location = filters.location;
   }
 
   if (filters.hasAvatar) {
-    params.has_avatar = true;
+    result.has_avatar = true;
   }
 
   if (filters.isOnline) {
-    params.is_online = true;
+    result.is_online = true;
   }
 
   if (filters.verifiedOnly) {
-    params.verified = true;
+    result.verified = true;
   }
 
   if (filters.minMutualFriends > 0) {
-    params.min_mutual_friends = filters.minMutualFriends;
+    result.min_mutual_friends = filters.minMutualFriends;
   }
 
   if (filters.genres.length > 0) {
-    params.genres = filters.genres;
+    result.genres = filters.genres;
   }
 
-  return params;
+  return result;
 };
 
 export default function SmartFriendSearch() {

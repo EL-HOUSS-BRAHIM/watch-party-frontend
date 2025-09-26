@@ -51,7 +51,7 @@ describe("API Client", () => {
   })
 
   it("handles response errors correctly", () => {
-    const responseInterceptor = mockedAxios.interceptors.response.use.mock.calls[0][1]
+    const responseInterceptor = mockedAxios.interceptors.response.use.mock.calls[0]?.[1]
     const error = {
       response: {
         status: 401,
@@ -59,6 +59,7 @@ describe("API Client", () => {
       },
     }
 
-    expect(() => responseInterceptor(error)).toThrow()
+    expect(responseInterceptor).toBeDefined()
+    expect(() => responseInterceptor!(error)).toThrow()
   })
 })

@@ -127,7 +127,7 @@ export const transformVideo = (raw: RawVideo | Video): Video => {
   const uploaderRaw: RawUser = {
     id: video.uploader?.id ?? "",
     username: video.uploader?.username ?? video.uploader?.display_name ?? "",
-    email: video.uploader?.email ?? "",
+    email: "",
     first_name: video.uploader?.first_name,
     last_name: video.uploader?.last_name,
     display_name: video.uploader?.display_name,

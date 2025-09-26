@@ -54,9 +54,10 @@ const resolveStatus = (status: any, isOnlineFallback?: boolean): OnlineFriend['s
 const normalizeActivity = (activity: any): OnlineFriend['activity'] | undefined => {
   if (!activity) return undefined;
 
-  const rawType = (activity.type ?? activity.activity_type ?? '').toString().toLowerCase();
-  let type: OnlineFriend['activity']['type'] = 'watching';
+  let type: NonNullable<OnlineFriend['activity']>['type'] = 'watching';
 
+  const rawType = (activity.type ?? activity.activity_type ?? '').toString().toLowerCase();
+  
   if (rawType.includes('party')) {
     type = 'in_party';
   } else if (rawType.includes('brows')) {
