@@ -175,7 +175,7 @@ export default function PushPermissionRegistration() {
       
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as BufferSource,
       });
 
       const subscriptionData: PushSubscription = {
@@ -319,7 +319,7 @@ export default function PushPermissionRegistration() {
     return btoa(binary);
   };
 
-  const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
+  const urlBase64ToUint8Array = (base64String: string): ArrayBufferLike => {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
     const rawData = atob(base64);
@@ -327,7 +327,7 @@ export default function PushPermissionRegistration() {
     for (let i = 0; i < rawData.length; ++i) {
       outputArray[i] = rawData.charCodeAt(i);
     }
-    return outputArray;
+    return outputArray.buffer;
   };
 
   const getPermissionStatus = () => {

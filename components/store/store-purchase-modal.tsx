@@ -86,12 +86,13 @@ export function StorePurchaseModal({ item, isOpen, onClose, onPurchaseComplete }
         item_id: item.id,
         quantity
       })
+      const data = response.data as { valid: boolean; discount_percentage: number }
       
-      if (response.data.valid) {
-        setPromoDiscount(response.data.discount_percentage)
+      if (data.valid) {
+        setPromoDiscount(data.discount_percentage)
         toast({
           title: 'Promo code applied!',
-          description: `${response.data.discount_percentage}% discount applied`,
+          description: `${data.discount_percentage}% discount applied`,
         })
       } else {
         setPromoDiscount(0)

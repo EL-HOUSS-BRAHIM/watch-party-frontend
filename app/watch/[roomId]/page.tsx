@@ -388,9 +388,9 @@ export default function WatchRoomPage() {
       user: {
         id: user.id,
         username: user.username,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        avatar: user.avatar,
+        firstName: user.first_name || '',
+        lastName: user.last_name || '',
+        avatar: user.avatar || undefined,
       },
       message: newMessage.trim(),
       timestamp: new Date().toISOString(),

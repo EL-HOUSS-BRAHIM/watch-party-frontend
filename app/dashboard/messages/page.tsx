@@ -286,7 +286,7 @@ export default function MessagesPage() {
                     <Avatar className="w-8 h-8">
                       <AvatarImage src={onlineUser.avatar || "/placeholder-user.jpg"} />
                       <AvatarFallback className="text-sm">
-                        {onlineUser.firstName[0]}{onlineUser.lastName[0]}
+                        {(onlineUser.firstName?.[0] || 'U')}{(onlineUser.lastName?.[0] || 'U')}
                       </AvatarFallback>
                     </Avatar>
                     {onlineUser.isOnline && (
@@ -436,7 +436,7 @@ export default function MessagesPage() {
                           <Avatar className="w-8 h-8">
                             <AvatarImage src={selectedConversation.participants.find(p => p.id === message.senderId)?.avatar || "/placeholder-user.jpg"} />
                             <AvatarFallback className="text-xs">
-                              {selectedConversation.participants.find(p => p.id === message.senderId)?.firstName[0] || "U"}
+                              {selectedConversation.participants.find(p => p.id === message.senderId)?.firstName?.[0] || "U"}
                             </AvatarFallback>
                           </Avatar>
                         )}
