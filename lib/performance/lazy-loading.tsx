@@ -1,16 +1,16 @@
 "use client"
 
-import { lazy, type ComponentType, Suspense } from "react"
+import { lazy, type ComponentType, type ComponentProps, Suspense } from "react"
 import { useState, useCallback, useEffect, useRef } from "react"
 
 // Lazy loading utility with error boundary
-export function createLazyComponent<T extends ComponentType<any>>(
+export function createLazyComponent<T extends ComponentType<Record<string, unknown>>>(
   importFunc: () => Promise<{ default: T }>,
   fallback?: ComponentType,
 ) {
   const LazyComponent = lazy(importFunc)
 
-  return (props: any) => {
+  const WrappedComponent = (props: ComponentProps<T>) => {
     const FallbackComponent = fallback
     return (
       <Suspense fallback={FallbackComponent ? <FallbackComponent /> : <div>Loading...</div>}>
@@ -18,6 +18,10 @@ export function createLazyComponent<T extends ComponentType<any>>(
       </Suspense>
     )
   }
+  
+  WrappedComponent.displayName = `LazyComponent(${LazyComponent.displayName || LazyComponent.name || 'Anonymous'})`
+  
+  return WrappedComponent
 }
 
 // Image lazy loading hook

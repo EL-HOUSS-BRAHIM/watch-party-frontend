@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import {
   Heart,
   Users,
@@ -8,9 +7,7 @@ import {
   Github,
   Twitter,
   Mail,
-  Zap,
   Globe,
-  Shield,
   MessageCircle,
   Video,
   Calendar,
@@ -266,7 +263,7 @@ export default function AboutPage() {
             <div className="text-center mb-12">
               <h2 className="text-3xl font-bold mb-4 text-white">What Makes Us Special</h2>
               <p className="text-lg text-white/80 max-w-2xl mx-auto">
-                We've built WatchParty with features that enhance connection and make watching together as seamless as
+                We&apos;ve built WatchParty with features that enhance connection and make watching together as seamless as
                 being in the same room.
               </p>
             </div>
@@ -302,7 +299,7 @@ export default function AboutPage() {
                 Meet Our Team
               </h2>
               <p className="text-lg text-white/80 max-w-2xl mx-auto">
-                We're a passionate team of builders, designers, and community enthusiasts dedicated to creating the best
+                We&apos;re a passionate team of builders, designers, and community enthusiasts dedicated to creating the best
                 shared viewing experience possible.
               </p>
             </div>
@@ -343,7 +340,7 @@ export default function AboutPage() {
                 Our Journey
               </h2>
               <p className="text-lg text-white/80 max-w-2xl mx-auto">
-                From a simple idea to a thriving community - here's how WatchParty has evolved.
+                From a simple idea to a thriving community - here&apos;s how WatchParty has evolved.
               </p>
             </div>
 
@@ -406,7 +403,7 @@ export default function AboutPage() {
                         </div>
                       </div>
                     </div>
-                    <p className="text-white/80">"{testimonial.content}"</p>
+                    <p className="text-white/80">&ldquo;{testimonial.content}&rdquo;</p>
                   </CardContent>
                 </Card>
               ))}
@@ -419,7 +416,7 @@ export default function AboutPage() {
               <CardContent className="p-8 md:p-12 text-center">
                 <h2 className="text-3xl font-bold mb-4 text-white">Get in Touch</h2>
                 <p className="text-lg mb-8 text-white/80">
-                  Have questions, feedback, or just want to say hello? We'd love to hear from you!
+                  Have questions, feedback, or just want to say hello? We&apos;d love to hear from you!
                 </p>
 
                 <div className="grid md:grid-cols-3 gap-6 mb-8">

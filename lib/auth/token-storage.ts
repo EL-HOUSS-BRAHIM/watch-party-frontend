@@ -16,7 +16,7 @@ const getStorage = (): Storage | null => {
 
   try {
     return window.sessionStorage
-  } catch (error) {
+  } catch {
     console.warn("Session storage is not accessible, falling back to in-memory tokens only.")
     return null
   }

@@ -8,14 +8,14 @@ interface CacheOptions {
 }
 
 class MemoryCache {
-  private cache = new Map<string, { data: any; timestamp: number; ttl: number }>()
+  private cache = new Map<string, { data: unknown; timestamp: number; ttl: number }>()
   private maxSize: number
 
   constructor(maxSize = 100) {
     this.maxSize = maxSize
   }
 
-  set(key: string, data: any, ttl = 5 * 60 * 1000) {
+  set(key: string, data: unknown, ttl = 5 * 60 * 1000) {
     if (this.cache.size >= this.maxSize) {
       const firstKey = this.cache.keys().next().value
       if (firstKey) {
@@ -54,7 +54,7 @@ class MemoryCache {
 const globalCache = new MemoryCache()
 
 export function useCache<T>(key: string, fetcher: () => Promise<T>, options: CacheOptions = {}) {
-  const { ttl = 5 * 60 * 1000, maxSize = 100 } = options
+  const { ttl = 5 * 60 * 1000 } = options
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
